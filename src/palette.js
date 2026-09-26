@@ -85,8 +85,6 @@ export const PALETTES = {
   doorHandle:     ['#d8c268', '#a8a8a8'],
   doorHandleLit:  ['#fff0b4', '#d8d8d8'],
   triedMark:      ['#f0dcdc', '#f0dcdc'],
-  partyLeak:      ['#8e4cd8', '#8e4cd8'],
-  partyLeakLit:   ['#d6a8ff', '#d6a8ff'],
   plate:          ['#8e8a9e', '#727272'],
   // the yellow crosshair the road markings make at a four-way junction
   hellCross:      ['#b09433', '#e8452f'],

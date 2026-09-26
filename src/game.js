@@ -2,16 +2,16 @@ import {
   MIN_PER_SEC, NIGHT_MINUTES, BLOOD_DRAIN, BLOOD_MAX, MANA_MAX,
   CANDY_PER_WRONG_DOOR, PUNCH_BLOOD, BUMP_BLOOD, BUMP_STAGGER, BUMP_SHAKE,
   SIM_RADIUS, BASS_RADIUS, VISION_SECONDS, VISION_FADE, VISION_TAPER,
-  VISION_BLEED, REVEAL, CAT_TOUCH,
+  VISION_BLEED, REVEAL, CAT_TOUCH, MAX_TIPS,
 } from './config.js';
 import { makeRng, hashSeed } from './rng.js';
 import { buildCity, ringPoint, nearestRingT, blockAt, isWalkable } from './city.js';
 import { populate, updateKid, updateCat } from './entities.js';
 import { makePlayer, updatePlayer, tryBat, wantedFollowers, shove } from './player.js';
 import {
-  FACT_KEYS, realLine, exhaustedLine, catLine, factText,
+  FACT_KEYS, makeTip, tipLine, exhaustedLine, fullLine, catLine, factText,
 } from './hints.js';
-import { sfx, setBassProximity } from './audio.js';
+import { sfx, setBassProximity, stopMusic } from './audio.js';
 
 const DOOR_REACH = 46;
 const TALK_REACH = 48;
@@ -43,7 +43,11 @@ export function newGame(seedStr, citySeed) {
     seed: seedStr, rng, city, world, player,
     state: 'title',
     clock: { t: 0, minutes: 0 },
-    knowledge: {}, tipsTaken: 0,
+    // Every tip you have been told, in the order it arrived, true and false
+    // mixed together with nothing to tell them apart.  There is no reduced
+    // "what you know" any more: half of this is a lie, so the game cannot
+    // hold an answer on your behalf, only the claims.
+    tips: [], tipsTaken: 0,
     toasts: [], log: [],
     prompt: null, dialogue: null, target: null,
     vision: 0, visionMix: 0, bleed: 0, camShake: 0,
@@ -56,11 +60,28 @@ export function newGame(seedStr, citySeed) {
  * Pull a buried tip up to the front of the deck.  Position in the pile is just
  * the order the tips arrived in, so coming forward is simply becoming the
  * newest thing you were told - no separate shuffle state to keep in step.
+ * `id` never moves, which is what a click is resolved against.
  */
-export function bringTipForward(game, key) {
-  if (!game.knowledge[key]) return false;
-  game.knowledge[key] = ++game.tipsTaken;
+export function bringTipForward(game, id) {
+  const tip = game.tips.find(t => t.id === id);
+  if (!tip) return false;
+  tip.order = ++game.tipsTaken;
   return true;
+}
+
+/**
+ * Deal one card onto the deck, if there is room.  The only way facts enter
+ * the game - the console hooks come through here too, so there is one place
+ * that knows what a tip is made of and one place that knows when to stop.
+ * Returns null once the night's five are gone.
+ */
+export function giveTip(game, key, lie, from) {
+  if (game.tips.length >= MAX_TIPS) return null;
+  const tip = makeTip(game.rng, game.city, key, lie);
+  tip.id = tip.order = ++game.tipsTaken;
+  tip.from = from;
+  game.tips.push(tip);
+  return tip;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,46 +315,61 @@ export function knock(game, door) {
   toast(game, `+${CANDY_PER_WRONG_DOOR} candy   +${PUNCH_BLOOD} blood`, '#e8b23a');
 }
 
+// A witch hands over the hardest thing she can, in this order.  Listed by
+// hand rather than read off FACT_KEYS, so the two can be reordered apart.
+const WITCH_ORDER = ['district', 'avenue', 'street', 'deco'];
+
 function talk(game, npc) {
   const { city, rng } = game;
   sfx.talk();
   game.stats.talks++;
   const label = npc.kind === 'witch' ? 'WITCH' : 'VAMPIRE';
 
-  const unknown = FACT_KEYS.filter(k => !game.knowledge[k]);
-  if (npc.talked > 0 || unknown.length === 0) {
+  // Five a night and no more.  There is no "you already know everything" -
+  // you can be told the same fact twice and that is the only way to catch a
+  // liar - but the night stops handing them over at MAX_TIPS, so the fifth
+  // card is the last thing anybody in this city will tell you.
+  if (game.tips.length >= MAX_TIPS) {
+    game.dialogue = {
+      name: label, nameColor: npc.kind === 'witch' ? '#7aff9a' : '#ff6a7a',
+      text: fullLine(rng, npc.kind),
+    };
+    return;
+  }
+  if (npc.talked > 0) {
     const d = Math.hypot(game.player.x - city.party.ax, game.player.y - city.party.ay);
     game.dialogue = {
       name: label, nameColor: npc.kind === 'witch' ? '#7aff9a' : '#ff6a7a',
-      text: exhaustedLine(rng, npc.kind, city.party, d),
+      text: exhaustedLine(rng, npc.kind, d, npc.liar),
     };
     return;
   }
 
-  // a real witch will hand over the hardest thing she can
-  const order = npc.kind === 'witch'
-    ? ['district', 'avenue', 'street', 'deco']
-    : rng.shuffle(unknown.slice());
-  const key = order.find(k => unknown.includes(k)) || unknown[0];
-  // the value is the order it arrived in, so the deck can put the newest on
-  // top; every reader of `knowledge` only ever asks whether it is truthy
-  game.knowledge[key] = ++game.tipsTaken;
+  // Whichever fact you have heard least about.  Corroboration is the game
+  // now, and you cannot corroborate a fact nobody has mentioned - so the deck
+  // fills out across all four before anyone doubles up on one.
+  const heard = {};
+  for (const k of FACT_KEYS) heard[k] = 0;
+  for (const t of game.tips) heard[t.key]++;
+  const fewest = Math.min(...FACT_KEYS.map(k => heard[k]));
+  const thin = FACT_KEYS.filter(k => heard[k] === fewest);
+  const key = npc.kind === 'witch'
+    ? (WITCH_ORDER.find(k => thin.includes(k)) || thin[0])
+    : rng.pick(thin);
+
+  const tip = giveTip(game, key, npc.liar, npc.kind);
   npc.talked++;
   sfx.clue();
-  game.log.push({ text: factText(key, city.party) });
+  game.log.push({ text: factText(tip.key, tip.value), lie: tip.lie });
 
-  let text = realLine(rng, npc.kind, key, city.party);
-  if (npc.kind === 'witch' && game.knowledge.district && game.knowledge.avenue && game.knowledge.street
-      && !game.knowledge.marked) {
-    game.knowledge.marked = true;
-    text += '  There. I have put it on your little map. Do not lose it twice.';
-  }
   game.dialogue = {
     name: label,
     nameColor: npc.kind === 'witch' ? '#7aff9a' : '#ff6a7a',
-    text,
+    text: tipLine(rng, npc.kind, tip),
   };
-  toast(game, 'CLUE', '#c9a8ff', true);
+  // Not "CLUE": it is a thing somebody said to you.  Half of them lie and the
+  // HUD must never be the thing that tells you which half you just met.
+  toast(game, `A TIP   ${game.tips.length}/${MAX_TIPS}`, '#c9a8ff', true);
 }
 
 /**
@@ -412,5 +448,7 @@ function die(game, title, text) {
   game.endTitle = title;
   game.endText = text;
   game.player.alive = false;
+  // the one word on the red field has nothing under it
+  stopMusic();
   sfx.lose();
 }

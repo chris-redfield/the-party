@@ -101,7 +101,8 @@ export function updatePlayer(p, dt, input) {
       p.faceX = vx; p.faceY = vy;
       p.dir = vy < -0.5 ? 'up' : 'down';
       p.anim += dt;
-      p.frame = Math.floor(p.anim * 6.5) % 2;
+      // three frames in the walk now: stride, pass, other stride
+      p.frame = Math.floor(p.anim * 7.5) % 3;
       p.stepTimer -= dt;
     } else {
       p.frame = -1;

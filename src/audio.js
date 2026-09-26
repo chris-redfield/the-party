@@ -1,4 +1,7 @@
-// Tiny procedural sound. No files, no library - just oscillators.
+// Tiny procedural sound - oscillators for everything that happens to you -
+// plus the one recorded thing in the game, which is the soundtrack.
+import { MUSIC, MUSIC_URL, MUSIC_GAIN, MUSIC_DUCK } from './config.js';
+
 let ac = null, master = null, bassGain = null, bassOsc = null, droneGain = null;
 let started = false;
 let muted = false;
@@ -18,6 +21,7 @@ export function resumeAudio() {
   if (!ac) return;
   if (ac.state === 'suspended') ac.resume();
   if (!started) { startBeds(); started = true; }
+  startMusic();
 }
 
 export function toggleMute() {
@@ -26,6 +30,71 @@ export function toggleMute() {
   return muted;
 }
 export function isMuted() { return muted; }
+
+// --- the soundtrack ---------------------------------------------------------
+// An <audio> element rather than a decoded buffer: it is five megabytes, and
+// decoding it into memory to play it front to back is the wrong trade.  It
+// goes through the master gain like everything else, so mute is mute.
+//
+// Browsers will not let a page make a noise before it has been touched, so
+// this can only ever be started from inside a real input event - it is called
+// from resumeAudio(), which the first keypress or click already runs.  A
+// rejected play() is normal and is not an error worth shouting about.
+let musicEl = null, musicGain = null, musicWanted = false;
+
+export function startMusic() {
+  if (!MUSIC || !ac) return;
+  if (!musicEl) {
+    musicEl = new Audio(MUSIC_URL);
+    musicEl.loop = true;
+    musicEl.preload = 'auto';
+    musicGain = ac.createGain();
+    musicGain.gain.value = MUSIC_GAIN;
+    try {
+      ac.createMediaElementSource(musicEl).connect(musicGain).connect(master);
+    } catch (e) {
+      // no Web Audio route (very old browser): play it straight out instead,
+      // which loses the ducking but keeps the music
+      musicEl.volume = MUSIC_GAIN;
+    }
+  }
+  musicWanted = true;
+  const p = musicEl.play();
+  if (p && p.catch) p.catch(() => {});
+}
+
+/** Pausing the game pauses the music; it picks up where it left off. */
+export function setMusicPaused(paused) {
+  if (!musicEl) return;
+  if (paused) musicEl.pause();
+  else if (musicWanted) { const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); }
+}
+
+/** A fresh night starts the night's music again from the top. */
+export function restartMusic() {
+  if (!musicEl) { startMusic(); return; }
+  musicEl.currentTime = 0;
+  if (musicGain) musicGain.gain.value = MUSIC_GAIN;
+  startMusic();
+}
+
+/**
+ * The end of a night.  The death screen is one word on a flat red field with
+ * nothing else on it, and a soundtrack still going underneath that is the
+ * game carrying on without you - so it goes.  Half a second, only so it does
+ * not end on a click.
+ */
+export function stopMusic() {
+  if (!musicEl) return;
+  musicWanted = false;
+  if (ac && musicGain) {
+    const now = ac.currentTime;
+    musicGain.gain.cancelScheduledValues(now);
+    musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), now);
+    musicGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+  }
+  setTimeout(() => { if (!musicWanted && musicEl) musicEl.pause(); }, 520);
+}
 
 // --- ambient beds -----------------------------------------------------------
 function startBeds() {
@@ -70,9 +139,20 @@ function pulseBass() {
 }
 
 let bassTarget = 0;
-/** 0..1 - how close the vampire is to the real party. */
+/**
+ * 0..1 - how close the vampire is to the real party.  It drives the bass, and
+ * it ducks the soundtrack out of the bass's way: since the purple light at the
+ * door was taken out, this thump is the only thing in the world that knows
+ * where the party is, and it cannot be competing with a mix.
+ */
 export function setBassProximity(k) {
-  bassTarget = Math.max(0, Math.min(1, k)) * 0.42;
+  k = Math.max(0, Math.min(1, k));
+  bassTarget = k * 0.42;
+  if (musicGain && musicWanted && ac) {
+    const want = MUSIC_GAIN * (1 - MUSIC_DUCK * k);
+    // a slow follow, so walking past the party does not pump the track
+    musicGain.gain.setTargetAtTime(want, ac.currentTime, 0.35);
+  }
 }
 
 // --- one-shots --------------------------------------------------------------

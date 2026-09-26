@@ -734,7 +734,7 @@ function drawDeco(ctx, kind, sx, sy, z) {
 // ---------------------------------------------------------------------------
 // Doors
 // ---------------------------------------------------------------------------
-function drawDoor(ctx, door, o, isParty, pulse) {
+function drawDoor(ctx, door, o) {
   const { ox, oy, z } = o;
   const col = COLOR_DOORS ? door.color : { hex: '#4a4a4a', trim: '#606060' };
   const px = ox + door.x * z;        // doorstep, centred on the south facade
@@ -812,18 +812,12 @@ function drawDoor(ctx, door, o, isParty, pulse) {
 
   drawDeco(ctx, door.deco.key, px + 34 * z, py - 30 * z, z);
 
-  if (isParty) {
-    // The only tell on the door itself, and only from close up: light getting
-    // out around a door that is shut on something loud.  It is painted on,
-    // like everything else here - the pulse is the colour changing, not the
-    // opacity.
-    const lit = lerpHex(C.partyLeak, C.partyLeakLit, pulse);
-    ctx.fillStyle = lit;
-    ctx.fillRect(dx - 2 * z, dy - 2 * z, dw + 4 * z, 2 * z);
-    ctx.fillRect(dx - 2 * z, dy - 2 * z, 2 * z, dh + 4 * z);
-    ctx.fillRect(dx + dw, dy - 2 * z, 2 * z, dh + 4 * z);
-    ctx.fillRect(dx - 3 * z, py - 3 * z, dw + 6 * z, 3 * z);
-  }
+  // The right door used to leak purple light around its frame from close up.
+  // It is gone: a door that looks different is a door you can find by looking,
+  // and then the tips, the lying and the whole deck are decoration on a game
+  // about walking around until you spot a glow.  The party is behind a door
+  // that looks exactly like the hundred and twenty-four others, and the only
+  // things that will tell you which is the bass and what you have been told.
 }
 
 // ---------------------------------------------------------------------------
@@ -1032,7 +1026,7 @@ function drawPlot(ctx, plot, block, o, t) {
     }
   }
 
-  if (plot.door) drawDoor(ctx, plot.door, o, plot.door.isParty, 0.5 + 0.5 * Math.sin(t * 4));
+  if (plot.door) drawDoor(ctx, plot.door, o);
 }
 
 // ---------------------------------------------------------------------------

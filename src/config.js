@@ -134,6 +134,10 @@ export const GLASS_UNIT = 4;          // px per art pixel of the hourglass
 // The digits are gone on purpose.  Set true to put a readout back under it.
 export const GLASS_CLOCK_TEXT = false;
 
+// The end of a night is one phrase on a flat red field and nothing else - no
+// prose, no tally of how it went.  Set true to put the stats back under it.
+export const END_STATS = false;
+
 // --- the night --------------------------------------------------------------
 export const NIGHT_SECONDS = 12 * 60;      // 12 real minutes ...
 export const NIGHT_MINUTES = 6 * 60;       // ... = midnight -> 6 AM
@@ -169,8 +173,36 @@ export const KIDS_PER_BLOCK = [3, 6];
 // treaters.  There are no adults out here, so these are the only things that
 // know anything, which is why there are more of them than there used to be.
 export const MONSTERS_PER_BLOCK = [0, 2];
+
+// Half of them lie.  A liar hands you a fact that is real somewhere else in
+// the city and wrong about the party, in exactly the words the truth would
+// have used - so no single tip is worth anything, only a tip standing next to
+// another tip that agrees with it.  0 puts the old honest city back.
+export const LIAR_CHANCE = 0.5;
+
+// And you only get five of them. Five is four facts and one second opinion:
+// exactly one thing you have been told can ever be corroborated in a night,
+// and you do not get to choose which - the monster picks whichever fact you
+// have heard least about. After the fifth card nobody will tell you anything
+// else, however many monsters you find.
+export const MAX_TIPS = 5;
 export const CAT_CHANCE = 0.45;            // per block
 export const SIM_RADIUS = 1400;            // entities further away idle
+
+// --- the soundtrack ---------------------------------------------------------
+// The one thing in this game that is a file rather than code.  It is streamed
+// through an <audio> element into the same master gain as the procedural
+// noise, so M mutes it with everything else, and it loops - it is three and a
+// half minutes against a twelve minute night.
+//
+// MUSIC_DUCK is the important one.  The bass leaking out of the real party is
+// now the only thing the world itself will tell you, so the music gets out of
+// its way: at the door the track is down by this much and the bass is what
+// you hear.  Turn MUSIC off for the old purely procedural build.
+export const MUSIC = true;
+export const MUSIC_URL = 'assets/ost/Game.m4a.mp4';
+export const MUSIC_GAIN = 1.0;         // full, before the 0.55 master gain
+export const MUSIC_DUCK = 0.55;        // how far it drops when you are on top of the party
 
 // --- party proximity --------------------------------------------------------
 export const BASS_RADIUS = 900;            // you start to feel the bass

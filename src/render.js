@@ -1,10 +1,11 @@
 import {
   TILE, TILE_N, WORLD, VIEW_W, VIEW_H, PX,
-  BASS_RADIUS, LIGHTING, DAWN_TINT, BUMP_ANIM, VISION_BLEED, BAT_POOF,
+  LIGHTING, DAWN_TINT, BUMP_ANIM, VISION_BLEED, BAT_POOF,
 } from './config.js';
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
+import { vampFrame } from './vampart.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
 import { drawGround, drawBuilding, drawLamp, lampPositions } from './scenery.js';
 
@@ -315,7 +316,10 @@ function drawPlayer(ctx, p, o, t) {
     cv = batSprite(Math.floor(p.anim * 9) % 2, PX * z);
     ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - (lift + hop) * z - cv.anchorY));
   } else {
-    cv = personSprite(PLAYER_SPEC, p.dir, p.frame, PX * z);
+    // his own artwork if it has loaded, the drawn placeholder until it has.
+    // The sheet faces right, so walking left is the same frame mirrored.
+    cv = vampFrame(p.dir === 'up', p.frame, p.faceX < -0.1, PX * z)
+      || personSprite(PLAYER_SPEC, p.dir, p.frame, PX * z);
     ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - hop * z - cv.anchorY));
   }
 
@@ -353,7 +357,7 @@ function drawPlayer(ctx, p, o, t) {
 // ---------------------------------------------------------------------------
 function drawLighting(ctx, o, blocks, game) {
   const { ox, oy, z } = o;
-  const { world, player, clock, city } = game;
+  const { world, player, clock } = game;
 
   // how dark is it?  pitch black at the witching hour, bleaching out near 6 AM
   const dawn = Math.max(0, (clock.minutes - 270) / 90);     // starts ~4:30 AM
@@ -381,15 +385,14 @@ function drawLighting(ctx, o, blocks, game) {
     for (const d of block.doors) if (d.deco.key === 'pumpkin') punch(d.ax, d.ay, 52, 0.6);
   }
   punch(player.x, player.y - 20, 90, 0.5);
-  const party = city.party;
-  punch(party.ax, party.ay, 120, 0.5 + 0.2 * Math.sin(clock.t * 4));
 
   lightCtx.globalCompositeOperation = 'source-over';
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(lightCanvas, 0, 0, VIEW_W, VIEW_H);
   ctx.imageSmoothingEnabled = false;
 
-  // additive warm pools + the party's purple bleed
+  // additive warm pools.  No purple bleed at the party door - LIGHTING is off,
+  // but if it is ever switched on it must not put the tell back.
   glowCtx.clearRect(0, 0, LW, LH);
   const add = (wx, wy, r, color, alpha) => {
     const rr = r * z * LS;
@@ -404,11 +407,6 @@ function drawLighting(ctx, o, blocks, game) {
   for (const block of blocks) {
     for (const l of lampPositions(block)) add(l.x, l.y - 26, 120, '#ffb84d', 0.20);
     for (const d of block.doors) if (d.deco.key === 'pumpkin') add(d.ax, d.ay, 46, '#ff8a1e', 0.35);
-  }
-  const pd = Math.hypot(player.x - party.ax, player.y - party.ay);
-  if (pd < BASS_RADIUS * 1.4) {
-    const k = 1 - Math.min(1, pd / (BASS_RADIUS * 1.4));
-    add(party.ax, party.ay, 150, '#a24cff', 0.28 * (0.6 + 0.4 * Math.sin(clock.t * 6)) + 0.2 * k);
   }
   glowCtx.globalAlpha = 1;
   ctx.save();

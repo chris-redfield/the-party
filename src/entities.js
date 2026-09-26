@@ -1,4 +1,4 @@
-import { KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE } from './config.js';
+import { KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, LIAR_CHANCE } from './config.js';
 import { ringPoint, nearestRingT } from './city.js';
 
 // The pavement of an old-fashioned 384px block, which is what the population
@@ -123,6 +123,11 @@ export function populate(rng, city) {
     // costume standing on the pavement - same sprite, same shove, same
     // nothing to say.  `disguise` is what you see; `spec` is what is
     // actually there, and only a cat will show you the difference.
+    //
+    // `liar` is decided here and never changes: about half of them will send
+    // you to the wrong side of the city and sound exactly like the half that
+    // will not.  Nothing on screen ever marks it - not the sprite, not the
+    // dialogue, not the card it gives you.
     const nNpc = Math.round(rng.int(MONSTERS_PER_BLOCK[0], MONSTERS_PER_BLOCK[1]) * busy);
     for (let i = 0; i < nNpc; i++) {
       const isWitch = rng.chance(0.42);
@@ -135,6 +140,7 @@ export function populate(rng, city) {
         x: p.x, y: p.y,
         bob: rng.range(0, 6.28),
         bump: 0, say: null, sayT: 0,
+        liar: rng.chance(LIAR_CHANCE),
         talked: 0, seed: rng.int(0, 1e9),
       });
     }

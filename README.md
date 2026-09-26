@@ -98,7 +98,7 @@ bag and the parade goes with it.
 
 **Nobody on the street talks to you.** Children want your candy and have
 nothing else to say. The only thing in this city that will tell you where the
-party is, is a monster — and see below.
+party is, is a monster — and half of the monsters lie about it. See below.
 
 **Four facts pin down one door:** the district, the avenue, the street, and
 what is hanging beside the door. Each one you are given is a playing card, and
@@ -113,25 +113,87 @@ lands on it.
 No two blocks share a south-west corner, so district + avenue + street lands
 you on exactly one block; the decoration then picks out which of that block's
 doors it is, which is why **no two doors on the same block hang the same thing
-beside them**. Every fact narrows the minimap, and the map counts the doors
-still standing. The avenues and streets are the roads the cut left behind,
+beside them**. The avenues and streets are the roads the cut left behind,
 numbered from the west and from the north — there are a few dozen of each and
 they are not evenly spaced, so the minimap prints the address of the block you
 are standing on.
 
-### Dying
+**Half of them are lying.** A monster is decided a liar or not the night it is
+spawned, and it never changes: about one in two of them will hand you a fact
+that is true of somewhere else in the city and false about the party. A lie
+always names a district, an avenue, a street or a decoration that really
+exists — it is never the right one, and it is never a street with no number.
+Nothing tells them apart. Same openers, same confidence, same card stock. The
+witch is no more honest than the vampire.
 
-There are two ways to lose — the blood runs out, or the sun comes up — and
-both of them land on the same screen, which is the one screen in the game
-that is not the game's palette at all. Flat blood red, edge to edge, the same
-`#cf1206` the cat's gift pours down the screen, because it is the same blood;
-it is just all outside you now. One word in black on it, `DEAD` or `ASH`, as
-big as the screen will take, and nothing else but the line telling you which
-key starts another night. You do not get told how it went. You get told that
-it is over.
+So there is no such thing as *what you know* any more, only **what you have
+been told**. The deck will happily hold two AVENUE cards that disagree; that
+is not a bug in it, that is one of them lying to you, and the game will never
+say which.
+
+**You get five tips a night and no more.** Five is the four facts and one
+second opinion: exactly one thing you are told can ever be corroborated, and
+you do not choose which — the monster picks whichever fact you have heard
+least about, so the fifth card falls where it falls. After it, every monster
+in the city has the same nothing to say to you, however many you find. The
+deck counts itself `n/5` in the corner so you know how many asks you have
+left, which is inventory rather than deduction. `MAX_TIPS` is the number.
+
+**Nothing is deduced for you.** The map used to intersect your facts and cross
+off every door they excluded. It cannot do that now — with lies in the deck an
+honest intersection of everything you have been told is empty nine times in
+ten. So the map stops eliminating and starts **shading**: every tip colours in
+every block it would allow, the colours stack, and a block three tips agree on
+comes up hotter than a block only one mentioned. You read the overlap. A block
+nothing has shaded is not a block that has been ruled out — it is a block
+nobody has mentioned.
+
+The scale is absolute and it only ever goes up. An area a tip has shaded keeps
+exactly that colour for the rest of the night; the tips that come after it can
+add their own areas and climb the ramp where they coincide with it, and that
+is all they can do. Nothing on the map ever dims, because a shade going down
+is the map quietly taking a block off the table on your behalf — which, since
+it cannot know which half of your deck is lying, it has no business doing. The caption under the map counts the tips you hold and
+how deep the deepest agreement goes, and it never counts doors left, because
+none have been taken away.
+
+The shading is worth what you would expect it to be worth: one tip on its own
+is nearly worthless, four tips put the right door about four knocks from the
+top of the pile, and eight put it within one or two. Cross-checking a single
+fact is expensive — the monsters hand out whichever fact you have heard least
+about, so you need three cards of the same suit, and so twelve tips, before a
+suit can outvote a liar. Most nights you will be reading the shading, not
+counting cards.
+
+### How a night ends
+
+There are two ways to lose — the blood runs out, or the sun comes up — and one
+way to win, and all three of them land on the same screen, which is the one
+screen in the game that is not the game's palette at all. Flat blood red, edge
+to edge, the same `#cf1206` the cat's gift pours down the screen, because it is
+the same blood; it is just all outside you now. One phrase in black on it —
+`DEAD`, `ASH` or `YOU FOUND IT` — as big as the screen will take, and nothing
+else but the line telling you which key starts another night.
+
+A phrase of one word fills the width; a phrase of several stacks a word to a
+line and fills the height instead, and either way it is measured and scaled
+down to whatever actually fits, so nothing is ever cut off the edge.
+
+You do not get told how it went. Not when you die and not when you win: no
+prose, no tally of doors knocked or tips believed. You get told that it is
+over. `END_STATS` in `src/config.js` puts the tally back underneath if you
+want it.
 
 It is set in **Deathly**, the only real typeface in the game — everything
-else, down to the hourglass, is drawn out of code. It lives in `assets/` with
+else, down to the hourglass, is drawn out of code. It is not only on the end
+cards any more: the same face sets the word **PAUSED**, in the game's red over
+the stopped street, and every one of the floating lines the game throws up
+while you play — the tip landing, the candy, the child walking into you. Those
+keep their own colours, because what happened is in the colour, and they are
+stroked with the same dark outline every sprite in the game has, since a face
+this thin over a lit street needs it. The HUD proper — the bars, the cards,
+the minimap, the address — stays in the mono face: that is data, and data
+should not look like a horror poster. It lives in `assets/` with
 its licence, and is loaded over the FontFace API rather than declared in the
 stylesheet, because canvas text does not redraw itself when a font arrives
 late: it sets in the fallback and stays there. `DEATH_SIZE` in `src/hud.js`
@@ -185,9 +247,13 @@ seconds:
   does not include them, so a cat you have not spent yet is invisible — and
   untouchable — until the colour comes back
 
-Talk to one and you get a real fact. While the vision holds, the monsters near
-you also show as pinpricks on the minimap, which is most of how you find one
-in the time you have.
+Talk to one and you get one tip, once, for ever — and half of them are lying
+(see above). While the vision holds, the monsters near you also show as
+pinpricks on the minimap, which is most of how you find one in the time you
+have. A fact you have already been told is still worth being told again by
+somebody else — a second voice agreeing with the first is the only thing that
+makes either of them worth believing — but only until the fifth card, and then
+the city is done talking to you.
 
 Every cat carries the same thing and gives it once.
 
@@ -207,10 +273,13 @@ reads as a dropped frame, while a street doing it reads as the world changing.
 Going *in* is smooth either way, because going in is a wall of blood.
 
 **Proximity.** Within about two blocks of the real party you start to hear the
-bass, and it gets louder. There is light leaking out around the frame of the
-right door as well, but you have to be close to see it — and it is purple,
-which in vampire vision makes it the only thing in the world that is neither
-grey nor red.
+bass, and it gets louder. That is the only thing the world itself will tell
+you. The right door used to leak purple light around its frame from close up;
+it does not any more, because a door that looks different is a door you can
+find by looking, and that turns the tips, the lying and the whole deck into
+decoration on a game about wandering until you spot a glow. Every one of the
+hundred and twenty-five doors looks exactly like every other one, in both ways
+of seeing, right up until you knock on it.
 
 ### Look
 
@@ -327,9 +396,31 @@ it accelerates the way a falling thing does, covers for a beat and fades out,
 so nothing has to be timed against it. `REVEAL` is how far the changeover has
 to have gone before a monster drops its costume - the picture and the `[E]`
 prompt read the same number, so you can never talk to something that still
-looks like a child. `MONSTERS_PER_BLOCK` is how many of them are out there;
+looks like a child. `MONSTERS_PER_BLOCK` is how many of them are out there, `LIAR_CHANCE` how
+many of those are lying to you (0 gives you back the old honest city) and
+`MAX_TIPS` how many cards a night will hand over at all;
 `BUMP_BLOOD`, `BUMP_STAGGER`, `BUMP_ANIM` and `BUMP_SHAKE` tune what it feels
 like to be walked into, and `BAT_POOF` is how long the smoke hangs about.
+
+## Sound
+
+Everything that happens to you is made out of oscillators at the moment it
+happens — the step, the knock, the wrong door, the wings, the card landing.
+There are no sound files for any of it, and `src/audio.js` is the whole of it.
+
+The exception is the soundtrack, which is a real recording: `assets/ost` is
+streamed through an `<audio>` element into the same master gain as everything
+else, so it loops through the night, `M` mutes it with the rest, `ESC` pauses
+it where it stands, and a fresh night starts it again from the top. When you
+die it goes — the death screen is one word on a flat red field and a
+soundtrack still playing under it is the game carrying on without you.
+
+**It gets out of the way of the bass.** The thump leaking out of the real
+party is, since the light around that door was removed, the only thing the
+world itself will tell you about where the party is, so it cannot be fighting
+a mix: as you close on the door the track ducks by `MUSIC_DUCK` and the bass
+is what is left. `MUSIC_GAIN` is the level, and `MUSIC = false` gives you the
+old purely procedural build.
 
 ## Source layout
 
@@ -351,17 +442,39 @@ src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
 src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
-src/audio.js        procedural sound - no audio files
-src/sprites.js      PLACEHOLDER ART. self-contained on purpose.
+src/audio.js        procedural sound, and the one recorded thing there is:
+                    the soundtrack in assets/ost, streamed and looped
+src/sprites.js      PLACEHOLDER ART for everybody but the player.
+src/vampart.js      the player, who is a real drawing off a sheet in assets/
 src/input.js
 src/main.js         loop and wiring
 ```
 
-`src/sprites.js` is deliberately the only file that knows what anybody looks
-like. It builds every character out of small colour grids at load time and
-caches the result. To swap in real art, replace `personSprite`, `catSprite` and
-`batSprite` with something that returns a canvas or image with `anchorX` /
-`anchorY` set to the sprite's feet, and nothing else has to change.
+`src/sprites.js` knows what everybody in the city looks like, and builds every
+one of them out of small colour grids at load time. To swap in real art,
+replace `personSprite`, `catSprite` and `batSprite` with something that returns
+a canvas or image with `anchorX` / `anchorY` set to the sprite's feet, and
+nothing else has to change.
+
+**The vampire himself is the exception, and is not drawn out of code.** He is a
+real drawing — `assets/vamp-frente e verso-01.png`, a sheet of eight: column 0
+is his back, column 1 his front, row 0 standing still and rows 1–3 the walk.
+`src/vampart.js` cuts it up and puts it on screen, and `VAMP_BOX` in that file
+is how tall he stands (33 art pixels, a little over the 28 everybody else is —
+he is the one adult out there and the cape needs the room).
+
+Two things about the sheet decide how that file works. Its background is white
+**and so is his face**, so keying white out would punch a hole through his
+head: the transparency is flooded in from the edges of each cell instead, and
+white the outline encloses survives. And the eight drawings are not aligned to
+each other, so each is trimmed to its own ink and stood on the pavement by its
+own feet — all scaled by the same amount, off the tallest cell, so he does not
+change size between frames. The drawings face right, so walking left is the
+same frame mirrored; walking north shows his back and everything else shows his
+front. Nothing is generated into a file: the sheet stays the only copy of the
+art, and re-exporting it is all it takes to change him. Until it loads he is
+drawn with the old placeholder sprite, so a missing or broken sheet costs you
+nothing but his looks.
 
 ## Tinkering
 

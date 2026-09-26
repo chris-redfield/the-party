@@ -1,12 +1,13 @@
 import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS } from './config.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
-import { newGame, updateGame, knock, bringTipForward } from './game.js';
+import { newGame, updateGame, knock, bringTipForward, giveTip } from './game.js';
 import { FACT_KEYS } from './hints.js';
 import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
-import { drawHud, drawTitle, drawEnd, cardAt } from './hud.js';
-import { resumeAudio, toggleMute, setBassProximity } from './audio.js';
+import { drawHud, drawTitle, drawEnd, drawPause, cardAt, tipVotes } from './hud.js';
+import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic } from './audio.js';
 import { loadDeathFonts } from './deathtype.js';
+import { loadVampArt } from './vampart.js';
 
 const canvas = document.getElementById('game');
 canvas.width = VIEW_W; canvas.height = VIEW_H;
@@ -25,6 +26,9 @@ fit();
 // anything can be drawn with it.  Nothing waits on this: it is wanted minutes
 // into a night at the earliest, and until it lands the screen sets in serif.
 loadDeathFonts();
+// The player's own artwork, cut out of its sheet.  Nothing waits on this
+// either: until it lands he is drawn with the placeholder sprite.
+loadVampArt();
 
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
@@ -59,12 +63,12 @@ function canvasPoint(e) {
 function cardUnder(e) {
   if (game.state !== 'play' || paused) return null;
   const { x, y } = canvasPoint(e);
-  return cardAt(x, y, game.knowledge);
+  return cardAt(x, y, game.tips);
 }
 
 canvas.addEventListener('mousedown', (e) => {
-  const key = cardUnder(e);
-  if (key) { bringTipForward(game, key); e.preventDefault(); }
+  const id = cardUnder(e);
+  if (id) { bringTipForward(game, id); e.preventDefault(); }
 });
 
 // so it is discoverable at all: buried cards say they can be picked up
@@ -78,19 +82,7 @@ function restart() {
   cam.x = game.player.x;
   cam.y = game.player.y;
   paused = false;
-}
-
-function drawPause(c) {
-  c.fillStyle = 'rgba(6,4,14,0.78)';
-  c.fillRect(0, 0, VIEW_W, VIEW_H);
-  c.textAlign = 'center';
-  c.font = 'bold 54px "Courier New", monospace';
-  c.fillStyle = '#e8d8ff';
-  c.fillText('PAUSED', VIEW_W / 2, VIEW_H / 2 - 20);
-  c.font = 'bold 18px "Courier New", monospace';
-  c.fillStyle = '#a898c8';
-  c.fillText('ESC to go back out there   -   M mutes   -   [ ] zoom', VIEW_W / 2, VIEW_H / 2 + 24);
-  c.fillText('hold ESC and press R for a different night', VIEW_W / 2, VIEW_H / 2 + 52);
+  restartMusic();
 }
 
 function frame(now) {
@@ -116,7 +108,7 @@ function frame(now) {
     drawEnd(ctx, game, now / 1000);
     if (input.pressed('start')) restart();
   } else {
-    if (input.pressed('pause')) paused = !paused;
+    if (input.pressed('pause')) { paused = !paused; setMusicPaused(paused); }
     if (input.pressed('restart') && input.held('pause')) restart();
     if (paused) {
       setBassProximity(0);
@@ -144,9 +136,43 @@ window.PARTY = {
     game.player.y = game.city.party.ay;
     cam.x = game.player.x; cam.y = game.player.y;
   },
-  reveal() {
-    for (const k of FACT_KEYS) game.knowledge[k] = ++game.tipsTaken;
-    game.knowledge.marked = true;
+  /** four honest tips - the deck the game used to hand you by default */
+  reveal() { for (const k of FACT_KEYS) giveTip(game, k, false, 'reveal'); },
+  /** one lie, to see a contradiction land on the deck and the map */
+  lie(key) {
+    const t = giveTip(game, key || FACT_KEYS[1], true, 'reveal');
+    return t ? t.value : 'the deck is full - five a night';
+  },
+  /**
+   * After a run: was that night a mirage or just a night you could not find
+   * anybody?  Says how many tips you got, how many were lies, and whether the
+   * deepest shading on your map was over the real block or somewhere a liar
+   * sent you.  Reading it mid-run spoils the run.
+   */
+  postmortem() {
+    const g = game;
+    const { votes, max } = tipVotes(g.tips, g.city);
+    const pb = g.city.party.block.id;
+    const mine = votes.get(pb) || 0;
+    const hot = [...votes.entries()].filter(([, n]) => n === max).map(([id]) => id);
+    return {
+      clock: `${Math.floor(g.clock.minutes / 60)}:${String(Math.floor(g.clock.minutes % 60)).padStart(2, '0')}`,
+      tips: g.tips.length,
+      lies: g.tips.filter(t => t.lie).length,
+      monstersTalkedTo: g.stats.talks,
+      doorsKnocked: g.stats.knocks,
+      deepestShade: max,
+      shadeOverTheRealBlock: mine,
+      verdict: !g.tips.length ? 'no tips at all - you never reached a monster'
+        : mine === max ? `the map was pointing at it (${hot.length} block(s) that deep)`
+        : `MIRAGE - the deepest shading was ${max} deep and the real block only ${mine}`,
+      cards: g.tips.map(t => `${t.lie ? 'LIE ' : 'TRUE'}  ${t.key} = ${t.value}`),
+    };
+  },
+  /** which of your cards were lies - the one thing the game will not show you */
+  tips() {
+    return game.tips.map(t =>
+      `${t.lie ? 'LIE ' : 'TRUE'}  ${t.key} = ${t.value}  (from ${t.from})`);
   },
   skipTo(min) { game.clock.t = min / 360 * 720; },
   vision(sec) { game.vision = sec === undefined ? VISION_SECONDS : sec; },
