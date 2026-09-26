@@ -1,6 +1,6 @@
 import {
   KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, CAT_RISE, CAT_STRIDE, LIAR_CHANCE,
-  BEAST_SNAP,
+  BEAST_SNAP, BEAST_KEEP,
   PUMPKINS_PER_BLOCK, PUMPKIN_CROSSING_CHANCE, PUMPKIN_R, PUMPKIN_BLOCK,
   PUMPKIN_LAT, PUMPKIN_CROSS_LAT,
 } from './config.js';
@@ -205,12 +205,28 @@ export function populate(rng, city) {
   // They are not spawned onto the pavement, they are spawned onto a child -
   // the pavement is wherever their child is, and a child is only ever on one.
   // Nothing collides with them and nothing knows they are there.
+  //
+  // Each one is handed the list of everybody standing on its child's block.
+  // That is what it holds itself off - see updateBeast() - and a block's worth
+  // of people is a short enough list to walk every frame, where the city's
+  // thousand children is not.
+  const crowds = new Map();
+  const crowd = (block) => {
+    let c = crowds.get(block.id);
+    if (!c) { c = []; crowds.set(block.id, c); }
+    return c;
+  };
+  for (const k of kids) crowd(k.block).push(k);
+  for (const n of npcs) crowd(n.block).push(n);
+
   for (const k of kids) {
     beasts.push({
-      kind: 'beast', host: k, seed: rng.int(0, 1e9),
-      // where it hangs: off to one side and a little behind, its own distance
+      kind: 'beast', host: k, seed: rng.int(0, 1e9), crowd: crowd(k.block),
+      // where it would like to hang: off to one side and a little behind, its
+      // own distance, never nearer than the keep-out it is about to be pushed
+      // back out to anyway
       side: rng.chance(0.5) ? 1 : -1,
-      lag: rng.range(9, 20), back: rng.range(-3, 5),
+      lag: rng.range(BEAST_KEEP + 2, BEAST_KEEP + 14), back: rng.range(-4, 6),
       ease: rng.range(2.2, 4.4),        // how quickly it closes that gap
       bob: rng.range(0, 6.28), faceLeft: rng.chance(0.5),
       x: k.x, y: k.y,
@@ -264,6 +280,30 @@ export function updateKid(k, dt, player) {
  * there is nothing to take, so it keeps whichever way it last faced.
  */
 /**
+ * Shove a point out to BEAST_KEEP from everybody in `crowd` and from the
+ * player, if it has got nearer than that to any of them.  Twice over, because
+ * being pushed out of one child can put it inside the next.  Dead on top of
+ * somebody there is no direction to be pushed in, so it takes the side the
+ * beast prefers and goes there.
+ */
+function clearOfPeople(pt, crowd, player, side) {
+  for (let pass = 0; pass < 2; pass++) {
+    for (const q of crowd) clearOf(pt, q.x, q.y, side);
+    if (player) clearOf(pt, player.x, player.y, side);
+  }
+  return pt;
+}
+
+function clearOf(pt, px, py, side) {
+  const dx = pt.x - px, dy = pt.y - py;
+  const d = Math.hypot(dx, dy);
+  if (d >= BEAST_KEEP) return;
+  if (d < 0.01) { pt.x = px + side * BEAST_KEEP; pt.y = py; return; }
+  const out = (BEAST_KEEP - d) / d;
+  pt.x += dx * out; pt.y += dy * out;
+}
+
+/**
  * A beast keeps station on its child: off to one side, a little behind, and
  * always arriving rather than arrived - the easing is what makes it drag
  * after a child who breaks into a walk instead of being welded to it.  It has
@@ -272,17 +312,31 @@ export function updateKid(k, dt, player) {
  * Nothing here is collision, and nothing here is on a pavement test.  It goes
  * where its child goes, and its child is the thing that knows about pavements.
  */
-export function updateBeast(b, dt) {
+export function updateBeast(b, dt, player) {
   const h = b.host;
-  const tx = h.x + b.side * b.lag, ty = h.y + b.back;
+  // Where it would like to stand, moved off anybody who is standing there.
+  const want = clearOfPeople({ x: h.x + b.side * b.lag, y: h.y + b.back },
+                             b.crowd, player, b.side);
+
+  const x0 = b.x;
   // Far away from where it should be - because the city stopped simulating it
   // while you were three blocks away - it is simply there.  Easing across half
   // a city would read as a thing flying at you down the street.
-  if (Math.hypot(tx - b.x, ty - b.y) > BEAST_SNAP) { b.x = tx; b.y = ty; return; }
-  const k = 1 - Math.exp(-b.ease * dt);      // same closing rate at any framerate
-  const x0 = b.x;
-  b.x += (tx - b.x) * k;
-  b.y += (ty - b.y) * k;
+  if (Math.hypot(want.x - b.x, want.y - b.y) > BEAST_SNAP) {
+    b.x = want.x; b.y = want.y;
+  } else {
+    const k = 1 - Math.exp(-b.ease * dt);    // same closing rate at any framerate
+    b.x += (want.x - b.x) * k;
+    b.y += (want.y - b.y) * k;
+  }
+
+  // And then the same again on where it actually ended up, which is the half
+  // that does the work: it is always arriving rather than arrived, so aiming
+  // it at clear ground is not the same as it being on clear ground - the
+  // child it is trailing walks, and walks into it.  Resolving the position
+  // itself is what makes the keep-out a fact rather than an intention.
+  clearOfPeople(b, b.crowd, player, b.side);
+
   // it turns to face the way it is travelling, and keeps facing that way when
   // it stops - a beast that snaps back to a default facing at rest twitches
   if (Math.abs(b.x - x0) > 0.05) b.faceLeft = b.x < x0;

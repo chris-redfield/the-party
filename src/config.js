@@ -214,6 +214,14 @@ export const CAT_STRIDE = 7;
 // catching up from wherever it was left, which must not be a flight down the
 // street.
 export const BEAST_SNAP = 90;
+// How much room a beast leaves around a person.  It is measured from the
+// middle of one to the middle of the other, and a child and a beast are each
+// about eight art pixels either side of their middle, so at 20 the two
+// drawings have clear ground between them.  This is a keep-out and not a
+// preference: the beast is pushed out of anybody it would stand on, its own
+// child included, which is why a pack of four children ends up ringed by
+// their beasts rather than wearing them.
+export const BEAST_KEEP = 20;
 
 // --- pumpkins in the way -----------------------------------------------------
 // Somebody has left them out on the pavement and on the crossings.  They are

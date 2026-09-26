@@ -295,7 +295,16 @@ Every cat carries the same thing and gives it once.
 every single trick-or-treater in the city — over a thousand of them — and you
 never see one without a cat's eyes. Each keeps station on its own child: off to
 one side, a little behind, always closing the gap rather than welded to it,
-and off the ground, so it lays nothing on the pavement. They do not walk,
+and off the ground, so it lays nothing on the pavement.
+
+**They stand near people and never on them.** `BEAST_KEEP` is a hard 20 art
+pixels from the middle of a beast to the middle of anybody — its own child,
+everybody else on that child's block, and you — and it is enforced on where
+the beast *ends up*, not only on where it was aiming. That distinction is the
+whole of it: a beast is always arriving rather than arrived, and the child it
+trails walks, and walks into it. What it buys is that a pack of four children
+comes with a ring of beasts around it rather than a pack of children wearing
+them. They do not walk,
 because they do not touch anything: nothing collides with them, nothing knows
 they are there, and no pavement test is ever run on them. Their child is the
 thing that knows about pavements, and they go where it goes.

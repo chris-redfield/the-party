@@ -238,7 +238,7 @@ export function updateGame(game, dt, input) {
   // time the vision came up.
   for (const b of world.beasts) {
     if (Math.abs(b.host.x - p.x) + Math.abs(b.host.y - p.y) > SIM_RADIUS) continue;
-    updateBeast(b, dt);
+    updateBeast(b, dt, p);
   }
 
   manageFollowers(game);
