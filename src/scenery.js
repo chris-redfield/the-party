@@ -18,7 +18,6 @@
 // of `C`, and the textures tint themselves against whatever is under them.
 // ---------------------------------------------------------------------------
 import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS } from './config.js';
-import { CROSS_SHAFT } from './city.js';
 import { makeRng } from './rng.js';
 import { C, MIX, lerpHex } from './palette.js';
 
@@ -224,7 +223,7 @@ function windowPart(variant, z) {
 }
 
 // ---------------------------------------------------------------------------
-// The road
+// Road paint, and what burns it off
 // ---------------------------------------------------------------------------
 /**
  * Worn paint.  Road markings are never a clean rectangle - they get eaten at
@@ -277,28 +276,25 @@ function hellCross(ctx, o, j) {
     ctx.fillStyle = col;
     ctx.fillRect(jx + x * z, jy + y * z, w * z, h * z);
   };
-  // the bar fills whatever junction it is standing in, and no two junctions
-  // are the same width now that the roads are not all one size
-  const UP = CROSS_SHAFT, ARM = j.span;
-  // the stub below the bar stops inside the road it is lying on, and the
-  // shaft and bar are thick enough to cover the paint they replace - which
-  // on an avenue is two lines and not one
-  const DOWN = Math.min(62, j.arm - 2);
-  const T = j.twin ? 11 : 8, CAP = 15;          // half-thickness, half-cap
+  // Every measurement was worked out with the junction, in city.js: the bar
+  // is as long as this junction has room for, the stub as deep, and the
+  // whole figure keeps CROSS_CLEAR off the kerb on all four sides.
+  const UP = j.up, DOWN = j.down, ARM = j.bar;
+  const T = j.t, CAP = j.cap, B = j.burn, CW = j.capW, CB = j.capB;
   // the burn around it first, so every edge of the figure has a dark lip
-  R(-T - 5, -UP - 5, (T + 5) * 2, UP + DOWN + 10, edge);
-  R(-ARM, -T - 5, ARM * 2, (T + 5) * 2, edge);
-  R(-CAP - 5, -UP - 5, (CAP + 5) * 2, 13, edge);
-  R(-CAP - 5, DOWN - 8, (CAP + 5) * 2, 13, edge);
-  R(-ARM, -CAP - 5, 13, (CAP + 5) * 2, edge);
-  R(ARM - 13, -CAP - 5, 13, (CAP + 5) * 2, edge);
+  R(-T - B, -UP - B, (T + B) * 2, UP + DOWN + 2 * B, edge);
+  R(-ARM, -T - B, ARM * 2, (T + B) * 2, edge);
+  R(-CAP - B, -UP - B, (CAP + B) * 2, CB, edge);
+  R(-CAP - B, DOWN - CW, (CAP + B) * 2, CB, edge);
+  R(-ARM, -CAP - B, CB, (CAP + B) * 2, edge);
+  R(ARM - CB, -CAP - B, CB, (CAP + B) * 2, edge);
   // the figure
   R(-T, -UP, T * 2, UP + DOWN, ink);            // the shaft, long end up
   R(-ARM, -T, ARM * 2, T * 2, ink);             // the bar, low on the shaft
-  R(-CAP, -UP, CAP * 2, 8, ink);                // and the four capped ends
-  R(-CAP, DOWN - 8, CAP * 2, 8, ink);
-  R(-ARM, -CAP, 8, CAP * 2, ink);
-  R(ARM - 8, -CAP, 8, CAP * 2, ink);
+  R(-CAP, -UP, CAP * 2, CW, ink);               // and the four capped ends
+  R(-CAP, DOWN - CW, CAP * 2, CW, ink);
+  R(-ARM, -CAP, CW, CAP * 2, ink);
+  R(ARM - CW, -CAP, CW, CAP * 2, ink);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,11 +349,18 @@ function drawRoadSeg(ctx, o, r, idx) {
     ctx.stroke();
   }
 
-  // the centre line.  An avenue gets two of them; a lane gets one.
+  // The centre line.  An avenue gets two of them; a lane gets one.  Neither
+  // is painted through a junction: `r.gaps` is every stretch of this road
+  // that another road runs over, and a line carried across one of those runs
+  // into the side of the other road or doubles up with its markings.  The
+  // twin line is drawn narrow enough that the shaft of the cross covers all
+  // of it when it burns through.
   const dash = 44, gap = 44;
   const twin = r.w >= 152;
+  const blocked = (a, b) => r.gaps.some(g => a < g[1] - a0 && g[0] - a0 < b);
   for (let t = 6; t < len - dash; t += dash + gap) {
-    if (twin) { P(t, -11, dash, 5, C.laneLine); P(t, 6, dash, 5, C.laneLine); }
+    if (blocked(t, t + dash)) continue;
+    if (twin) { P(t, -9, dash, 4, C.laneLine); P(t, 5, dash, 4, C.laneLine); }
     else P(t, -3, dash, 6, C.laneLine);
   }
 

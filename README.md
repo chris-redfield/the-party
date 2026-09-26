@@ -199,6 +199,15 @@ hard-edged next to it. All of it is in `src/scenery.js`, which draws the
 ground, the buildings, the doors, the decorations and the lamps, and knows
 nothing about the game.
 
+**Centre lines stop at junctions.** On the old grid every crossing was a clean
+four-way, and two centre lines crossing in the middle of one read as a
+crosshair. The cut makes tees, staggered crossings and roads that run a little
+way into one another, and a centre line carried straight through one of those
+runs into the flank of the other road, or doubles up with a second line a few
+pixels from it. So every road knows the stretches of itself that another road
+overlaps and paints nothing there, which is what real road marking does
+anyway.
+
 **The one thing that is not flat is the material.** Every surface carries a
 texture: grit on the asphalt, dust on the concrete, gravel on a roof, a brick
 bond or rendered plaster on a facade, and a slow blotchy weathering over all
@@ -232,24 +241,36 @@ not by fading in over it.
 
 **The cross.** Saint Peter's: a Latin cross stood on its head, so the long
 shaft runs up and the short stub hangs below the bar, with all four ends
-capped. The shaft lies exactly along the vertical lane markings and the bar
-exactly along the horizontal ones, and it is opaque, so the paint it burns off
-simply stops being there — on an avenue that is a twin centre line rather than
-a single one, so the shaft is thicker there to cover both. It is drawn over
-the finished street rather than into it, because the shaft is longer than the
-junction it stands in and runs up the road past the block above - baked into
-that block's tile it would be cut off at the tile's own edge, which is exactly
-what it did.
+capped. It stands where the two roads' centre lines cross — not in the middle
+of the junction rectangle, which at a tee where one road stops short of the
+other's far kerb is a different point — and the shaft runs up the road along
+the centre line, opaque, so the paint it covers simply stops being there. On
+an avenue that is a twin centre line rather than a single one, and the twin
+line is painted narrow enough that the shaft covers both halves of it. It is
+drawn over the finished street rather than into it, because the shaft is
+longer than the junction it stands in and runs up the road past the block
+above - baked into that block's tile it would be cut off at the tile's own
+edge, which is exactly what it did.
+
+**It never reaches the kerb.** A cross touching the pavement reads as a road
+marking that has come loose, so every one of them keeps `CROSS_CLEAR` clear of
+the sidewalk on all four sides. That is a floor, not a target: the figure is
+drawn at `CROSS_SCALE` of its original size, and in a narrow lane where even
+that would run onto the pavement the bar and the stub are cut back further
+until they fit. So a cross in a grand avenue is a big one and a cross in a
+side street is a small one, and neither of them touches anything it should
+not.
 
 **Not every junction gets one.** A cross needs road above it to stand its
-shaft in, so it only goes where the road carries on north far enough - at a
-crossroads, and at any T that opens that way. And because a cross is most of
+shaft in, so it only goes where the road carries on north far enough — which,
+since the cut yields tees and corners and no crossroads at all, means any tee
+that opens that way. And because a cross is most of
 three hundred pixels tall while the junction under it is a fraction of that,
 two junctions close together would have one cross growing up through the
 next one's stub. Where a pair would touch, only the wider one is burned: two
 of them fighting reads as a drawing fault rather than as something coming up
-out of the road. Of about a hundred and thirty junctions in the city, a
-hundred and four end up with a cross.
+out of the road. Of a hundred and sixty-odd junctions in the city, a
+hundred and six end up with a cross.
 
 **A patch of ground never changes**, so the city is cached in fixed 512-pixel
 square tiles and stamped after that: the whole road surface costs one
@@ -330,7 +351,8 @@ is when a piece is oblong enough to be cut the long way, and `LOT_MERGE` /
 the depth of a single building, `PLOT_STOP` how often a plot is left whole,
 and `WALL_MIN` / `WALL_MAX` the range of building heights that gives a block
 its skyline. `ROAD_WIDTHS` is road width by depth of cut, `CITY_RIM` the ring
-road round the outside.
+road round the outside, and `CROSS_SCALE` / `CROSS_CLEAR` the size of the
+upside-down cross and the gap it keeps from the pavement.
 
 `?seed=anything` in the URL pins the night, so you can replay the same one.
 `?citySeed=anything` cuts a different city; without it the layout is always

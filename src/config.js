@@ -69,6 +69,16 @@ export const WALL_MAX = 108;
 export const ROAD_WIDTHS = [176, 152, 128, 112, 96];
 export const CROSS_W = 48;             // width of a painted pedestrian crossing
 
+// --- the upside-down cross --------------------------------------------------
+// How big the figure that burns out of a junction is, against the size it was
+// drawn at originally.  It is scaled as a whole, so it keeps its proportions.
+export const CROSS_SCALE = 0.8;
+// It must never reach the kerb: a cross touching the pavement reads as a
+// painted road marking that has come loose.  This is the gap it keeps from
+// the sidewalk on every side, and it wins over CROSS_SCALE at a tight
+// junction - a cross in a narrow lane comes out smaller still.
+export const CROSS_CLEAR = 10;
+
 // --- rendering --------------------------------------------------------------
 export const VIEW_W = 1280;
 export const VIEW_H = 720;

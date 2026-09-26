@@ -1,5 +1,5 @@
 import {
-  WORLD, WALK, TILE, TILE_N, CITY_SEED, CITY_RIM,
+  WORLD, WALK, TILE, TILE_N, CITY_SEED, CITY_RIM, CROSS_SCALE, CROSS_CLEAR,
   LOT_MIN, LOT_MAX, LOT_STOP, LOT_JITTER, LOT_ASPECT, LOT_MERGE, LOT_MERGE_MAX,
   PLOT_MIN, PLOT_MAX, PLOT_DEEP, PLOT_DEEP_MAX, PLOT_STOP, WALL_MIN, WALL_MAX,
   ROAD_WIDTHS, CROSS_W,
@@ -43,7 +43,21 @@ let CITY = null;
 export function setCity(c) { CITY = c; }
 export function getCity() { return CITY; }
 
-export const CROSS_SHAFT = 196;      // how far up the road the cross's shaft runs
+// The cross, in world pixels, scaled as one figure - see hellCross() in
+// scenery.js, which draws exactly these.  `t` is its half-thickness and has
+// a floor: the shaft has to cover the centre line it burns off, so it can
+// never be thinner than the paint underneath it.
+const CS = CROSS_SCALE;
+export const CROSS = {
+  up: Math.round(196 * CS),          // how far up the road the shaft runs
+  down: Math.round(62 * CS),         // the stub below the bar
+  cap: Math.round(15 * CS),          // half-width of a capped end
+  capW: Math.round(8 * CS),          // and how thick the cap is
+  capB: Math.round(13 * CS),         // ... with its burn
+  burn: Math.round(5 * CS),          // the dark lip around the whole figure
+  tAvenue: Math.round(11 * CS),      // half-thickness over a twin centre line
+  tLane: Math.round(8 * CS),         // ... and over a single one
+};
 
 const snap8 = (v) => Math.round(v / 8) * 8;
 const roadWidth = (depth) => ROAD_WIDTHS[Math.min(depth, ROAD_WIDTHS.length - 1)];
@@ -255,25 +269,38 @@ function buildJunctions(roads) {
       const x0 = Math.max(v.x0, h.x0), x1 = Math.min(v.x1, h.x1);
       const y0 = Math.max(v.y0, h.y0), y1 = Math.min(v.y1, h.y1);
       if (x1 - x0 < 8 || y1 - y0 < 8) continue;
-      const cy = (y0 + y1) / 2;
-      if (v.y0 > cy - CROSS_SHAFT) continue;       // no road above it to stand in
-      all.push({
-        x: (x0 + x1) / 2, y: cy,
-        arm: (h.y1 - h.y0) / 2, span: (x1 - x0) / 2,
-        // an avenue is marked with a twin centre line rather than a single
-        // one, and the cross has to be thick enough to burn all of it off
-        twin: v.w >= 152 || h.w >= 152,
-      });
+      // The cross stands where the two centre lines cross, not in the middle
+      // of the overlap: the shaft has to lie along the paint it burns off,
+      // and at a junction where one road stops short of the other's far kerb
+      // those are not the same point.
+      const jx = (v.x0 + v.x1) / 2, jy = (h.y0 + h.y1) / 2;
+      if (jx <= x0 || jx >= x1 || jy <= y0 || jy >= y1) continue;
+
+      const span = v.w / 2, arm = h.w / 2;      // to the kerb, across and along
+      if (v.y0 > jy - CROSS.up - CROSS.burn - CROSS_CLEAR) continue;   // no road above to stand the shaft in
+
+      // Sized to the junction it is in.  Nothing may come within CROSS_CLEAR
+      // of a kerb, so a narrow lane gets a cross smaller than CROSS_SCALE
+      // would have made it rather than one that runs onto the pavement.
+      const bar = Math.min(span * CROSS_SCALE, span - CROSS_CLEAR);
+      const down = Math.min(CROSS.down, arm - CROSS_CLEAR - CROSS.burn);
+      const t = v.w >= 152 ? CROSS.tAvenue : CROSS.tLane;
+      if (bar < CROSS.cap + CROSS.burn || down < CROSS.capW
+          || t + CROSS.burn > span - CROSS_CLEAR
+          || CROSS.cap + CROSS.burn > arm - CROSS_CLEAR) continue;     // too tight for a figure at all
+
+      // CROSS first: what is worked out per junction overrides the nominal
+      all.push({ ...CROSS, x: jx, y: jy, span, arm, bar, down, t });
     }
   }
 
-  // A cross is most of three hundred pixels tall and the junction it stands
-  // in is a fraction of that, so two junctions close together - and the cut
+  // A cross is most of two hundred pixels tall and the junction it stands in
+  // is a fraction of that, so two junctions close together - and the cut
   // makes plenty of those, including staggered crossroads sixteen pixels
   // apart - would have one cross growing up through the next one's stub.
   // Two of them fighting reads as a drawing fault rather than as something
-  // burning out of the road, so where a pair would touch, only one is burned:
-  // the wider junction, which is the one with the most road to burn.
+  // burning out of the road, so where a pair would touch, only one is
+  // burned: the wider junction, which is the one with the most road to burn.
   all.sort((a, b) => (b.span - a.span) || (b.arm - a.arm) || (a.y - b.y) || (a.x - b.x));
   const kept = [];
   for (const j of all) {
@@ -287,12 +314,47 @@ function buildJunctions(roads) {
 
 /** Exactly the ground a cross covers, burn included - see hellCross(). */
 function crossBounds(j) {
-  const down = Math.min(62, j.arm - 2);
-  const half = Math.max(j.span, 20);     // the bar, or the capped ends of it
-  return { x0: j.x - half, y0: j.y - CROSS_SHAFT - 5, x1: j.x + half, y1: j.y + down + 5 };
+  const half = Math.max(j.bar, j.cap + j.burn);
+  return {
+    x0: j.x - half, x1: j.x + half,
+    y0: j.y - j.up - j.burn, y1: j.y + j.down + j.burn,
+  };
 }
 
 const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+// ---------------------------------------------------------------------------
+// Where the road markings stop
+// ---------------------------------------------------------------------------
+/**
+ * A centre line is not painted through a junction.  On the old grid every
+ * crossing was a clean four-way and two lines crossing in the middle of it
+ * read as a crosshair; the cut makes T-junctions, staggered crossings and
+ * roads that run a little way into one another, and a centre line carried
+ * through one of those runs into the side of the other road, or doubles up
+ * with a second line a few pixels away.  So each road is given the stretches
+ * of itself that any other road overlaps, and paints nothing there.
+ */
+function markGaps(roads) {
+  for (const r of roads) {
+    const vert = r.axis === 'v';
+    const gaps = [];
+    for (const o of roads) {
+      if (o === r) continue;
+      if (o.x1 <= r.x0 || o.x0 >= r.x1 || o.y1 <= r.y0 || o.y0 >= r.y1) continue;
+      gaps.push(vert ? [Math.max(r.y0, o.y0), Math.min(r.y1, o.y1)]
+                     : [Math.max(r.x0, o.x0), Math.min(r.x1, o.x1)]);
+    }
+    gaps.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const g of gaps) {
+      const last = merged[merged.length - 1];
+      if (last && g[0] <= last[1]) last[1] = Math.max(last[1], g[1]);
+      else merged.push(g);
+    }
+    r.gaps = merged;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Walkability
@@ -563,6 +625,7 @@ export function buildCity(rng, layoutSeed = CITY_SEED) {
   const lotAt = lotIndex(blocks);
   const crossings = buildCrossings(blocks, lotAt);
   checkConnected(blocks, crossings);
+  markGaps(roads);
   const junctions = buildJunctions(roads);
 
   // crossings are asked about every time the player takes a step, so they get
