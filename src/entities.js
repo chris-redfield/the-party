@@ -1,4 +1,8 @@
-import { KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, LIAR_CHANCE } from './config.js';
+import {
+  KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, LIAR_CHANCE,
+  PUMPKINS_PER_BLOCK, PUMPKIN_CROSSING_CHANCE, PUMPKIN_R, PUMPKIN_BLOCK,
+  PUMPKIN_LAT, PUMPKIN_CROSS_LAT,
+} from './config.js';
 import { ringPoint, nearestRingT } from './city.js';
 
 // The pavement of an old-fashioned 384px block, which is what the population
@@ -78,7 +82,7 @@ export function realWitchSpec(rng) {
 // Spawning
 // ---------------------------------------------------------------------------
 export function populate(rng, city) {
-  const kids = [], npcs = [], cats = [];
+  const kids = [], npcs = [], cats = [], pumpkins = [];
 
   for (const block of city.blocks) {
     const perim = block.perim;
@@ -145,6 +149,21 @@ export function populate(rng, city) {
       });
     }
 
+    // Pumpkins, left out on the pavement.  Always off to one side of it: the
+    // lateral offset is what keeps a lane open past them, and a pumpkin that
+    // shut a pavement would shut a whole side of a block.  They also keep
+    // clear of the doorsteps, because a door you cannot stand at is a door
+    // you cannot knock on.
+    const nPk = Math.round(rng.int(PUMPKINS_PER_BLOCK[0], PUMPKINS_PER_BLOCK[1]) * busy);
+    for (let i = 0; i < nPk; i++) {
+      const t = rng.range(0, perim);
+      const lat = (rng.chance(0.5) ? 1 : -1) * rng.range(PUMPKIN_LAT * 0.7, PUMPKIN_LAT);
+      const q = ringPoint(block, t, lat);
+      if (block.doors.some(d => Math.hypot(d.ax - q.x, d.ay - q.y) < 52)) continue;
+      pumpkins.push({ x: q.x, y: q.y, block, r: PUMPKIN_R, hit: PUMPKIN_BLOCK,
+                      seed: rng.int(0, 1e9) });
+    }
+
     if (rng.chance(Math.min(0.9, CAT_CHANCE * busy))) {
       const t = rng.range(0, perim);
       const lat = rng.range(-16, 16);
@@ -158,7 +177,22 @@ export function populate(rng, city) {
       });
     }
   }
-  return { kids, npcs, cats };
+  // And some on the crossings.  A crossing is only CROSS_W wide and it is the
+  // only way over a road, so these sit hard against one edge of it and never
+  // in the middle - there is always a clear lane on the other side, and the
+  // pumpkin is half out on the asphalt where nobody could walk anyway.
+  for (const c of city.crossings) {
+    if (!rng.chance(PUMPKIN_CROSSING_CHANCE)) continue;
+    const side = rng.chance(0.5) ? 1 : -1;
+    const mx = (c.x0 + c.x1) / 2, my = (c.y0 + c.y1) / 2;
+    const along = rng.range(0.3, 0.7);
+    const x = c.axis === 'v' ? mx + side * PUMPKIN_CROSS_LAT : c.x0 + (c.x1 - c.x0) * along;
+    const y = c.axis === 'v' ? c.y0 + (c.y1 - c.y0) * along : my + side * PUMPKIN_CROSS_LAT;
+    pumpkins.push({ x, y, block: null, r: PUMPKIN_R, hit: PUMPKIN_BLOCK,
+                    seed: rng.int(0, 1e9) });
+  }
+
+  return { kids, npcs, cats, pumpkins };
 }
 
 // ---------------------------------------------------------------------------

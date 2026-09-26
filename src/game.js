@@ -209,6 +209,20 @@ export function updateGame(game, dt, input) {
     }
   }
 
+  // Pumpkins are solid, and solid is all they are: they do not bite, they do
+  // not shout at you, they do not cost you anything. They stand in the way,
+  // you go round, and that is the whole of it. The wings clear them like they
+  // clear everybody else.
+  if (p.bat <= 0) for (const pk of world.pumpkins) {
+    if (Math.abs(pk.x - p.x) + Math.abs(pk.y - p.y) > 90) continue;
+    const dx = p.x - pk.x, dy = p.y - pk.y;
+    const d = Math.hypot(dx, dy);
+    if (d >= pk.hit) continue;
+    const a = d > 0.01 ? Math.atan2(dy, dx) : Math.random() * 6.2832;
+    const px = pk.x + Math.cos(a) * pk.hit, py = pk.y + Math.sin(a) * pk.hit;
+    if (isWalkable(px, py)) { p.x = px; p.y = py; }
+  }
+
   for (const c of world.cats) {
     if (Math.abs(c.x - p.x) + Math.abs(c.y - p.y) > SIM_RADIUS) continue;
     updateCat(c, dt);

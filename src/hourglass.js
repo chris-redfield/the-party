@@ -52,27 +52,40 @@ for (let ax = 0; ax <= HW_MAX; ax++) {
 const MOUND = 3.2;      // rows the bottom heap stands proud of its own level
 const DIP = 1.6;        // rows the top surface is sucked down over the drain
 
+// There is no colour in this object at all except the sun.  The bone, the
+// glass, the night sand, the stars, the moon it is grinding down, the grains
+// coming through the neck and the cracks that open in the last hour are all
+// greys - the same greys the old violet-and-gold palette worked out to, so
+// nothing has changed value or lost its separation, only its hue.
+//
+// The sun keeps one, and it is the game's own red: the thing building up in
+// the bottom bulb is the thing that ends you, and it is the exact red of the
+// screen it ends you on.  It is the only hue in the corner of the screen, so
+// the eye goes to it, which is the whole point of a clock you cannot read.
 const C = {
-  bone:    '#cbbfae',
-  boneLo:  '#9b8f7c',
-  boneDk:  '#6d6354',
-  socket:  '#1c1526',
-  ember:   '#ff5a2a',
-  glass:   '#7f6cb0',
-  glint:   '#b6a4e2',
-  thread:  '#8d80c0',
-  threadLo:'#c98a2e',
-  void:    '#1a1330',
-  night:   '#453a6e',
-  star:    '#bdb0e8',
-  moon:    '#ece4ff',
-  crater:  '#b5a8d8',
-  dawn:    '#9c5520',
-  dawnLo:  '#7a3f18',
-  sun:     '#ffc23a',
-  sunHot:  '#fff0b0',
-  ray:     '#ff8a2a',
-  crack:   '#d3c2ff',
+  bone:    '#c0c0c0',
+  boneLo:  '#909090',
+  boneDk:  '#646464',
+  socket:  '#191919',
+  glass:   '#797979',
+  glint:   '#b0b0b0',
+  thread:  '#8b8b8b',
+  threadLo:'#6e6e6e',
+  void:    '#181818',
+  night:   '#434343',
+  star:    '#bababa',
+  moon:    '#e9e9e9',
+  crater:  '#b1b1b1',
+  dawn:    '#6e6e6e',
+  dawnLo:  '#565656',
+  crack:   '#cecece',
+  // the sun, and nothing else
+  sun:     '#cf1206',   // the same red the death screen is
+  sunHot:  '#ff5544',   // ... and what it goes to in the last hour
+  ray:     '#8f1b10',
+  // the sockets in the last hour are the sun's light in them, not a colour
+  // of their own, so they are the only other thing allowed to be red
+  ember:   '#e8200c',
 };
 
 // The top cap is a skull, cut into the bone: eye sockets, a nose, and a row
@@ -259,12 +272,12 @@ export function drawHourglass(ctx, ox, oy, p, t, panic = false) {
       const y = y0 + (y1 - y0) * (ph * ph * 0.65 + ph * 0.35);
       if (y + U > y1) continue;
       const jx = Math.round(Math.sin(k * 9.7 + Math.floor(t * 20) * 1.9));
-      ctx.fillStyle = ph > 0.6 ? C.sun : C.star;
+      ctx.fillStyle = ph > 0.6 ? C.dawn : C.star;
       ctx.fillRect(colX(jx), Math.round(y), U, U);
     }
     // and the splash where it lands
     const sx = Math.floor(t * 12) % 2 ? 1 : -1;
-    ctx.fillStyle = C.sun;
+    ctx.fillStyle = C.dawn;
     ctx.fillRect(colX(sx), Math.round(y1) - U, U, U);
   }
 

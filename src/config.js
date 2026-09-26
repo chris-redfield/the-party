@@ -139,9 +139,16 @@ export const GLASS_CLOCK_TEXT = false;
 export const END_STATS = false;
 
 // --- the night --------------------------------------------------------------
-export const NIGHT_SECONDS = 12 * 60;      // 12 real minutes ...
+// Six in-game hours in six real minutes: one real second is one game minute,
+// which is a clock you can feel.  It was twelve, and halving it halves every
+// real-time budget in the game with it - how far you can walk, how many cats
+// you can find, how many of the five tips you can actually collect.  The
+// things that burn per real second (BLOOD_DRAIN, MANA_REGEN) now cost half as
+// much over a whole night; the things measured in seconds (VISION_SECONDS)
+// are now twice the share of it.
+export const NIGHT_SECONDS = 6 * 60;       // 6 real minutes ...
 export const NIGHT_MINUTES = 6 * 60;       // ... = midnight -> 6 AM
-export const MIN_PER_SEC = NIGHT_MINUTES / NIGHT_SECONDS;   // 0.5
+export const MIN_PER_SEC = NIGHT_MINUTES / NIGHT_SECONDS;   // 1.0
 
 // --- the vampire ------------------------------------------------------------
 export const BLOOD_MAX = 100;
@@ -187,13 +194,27 @@ export const LIAR_CHANCE = 0.5;
 // else, however many monsters you find.
 export const MAX_TIPS = 5;
 export const CAT_CHANCE = 0.45;            // per block
+
+// --- pumpkins in the way -----------------------------------------------------
+// Somebody has left them out on the pavement and on the crossings.  They are
+// about as big as a trick-or-treater and they are solid, but they never take
+// the whole width of anything: a pavement pumpkin sits off to one side and a
+// crossing one hugs its edge, so there is always a lane past it.  They cost
+// you nothing but the two steps it takes to go round - the wings clear them,
+// like they clear everybody else.
+export const PUMPKINS_PER_BLOCK = [0, 2];
+export const PUMPKIN_CROSSING_CHANCE = 0.22;   // per painted crossing
+export const PUMPKIN_R = 20;                   // world px - a child is ~48 across
+export const PUMPKIN_BLOCK = 22;               // how close you may get to one
+export const PUMPKIN_LAT = 16;                 // how far off the middle of the pavement
+export const PUMPKIN_CROSS_LAT = 12;           // ... and off the middle of a crossing
 export const SIM_RADIUS = 1400;            // entities further away idle
 
 // --- the soundtrack ---------------------------------------------------------
 // The one thing in this game that is a file rather than code.  It is streamed
 // through an <audio> element into the same master gain as the procedural
 // noise, so M mutes it with everything else, and it loops - it is three and a
-// half minutes against a twelve minute night.
+// half minutes against a six minute night.
 //
 // MUSIC_DUCK is the important one.  The bass leaking out of the real party is
 // now the only thing the world itself will tell you, so the music gets out of

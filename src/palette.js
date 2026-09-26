@@ -94,6 +94,17 @@ export const PALETTES = {
   decoPumpkinLit: ['#ffb44a', '#d8d8d8'],
   decoPumpkinDark:['#8f4f12', '#6e6e6e'],
   decoGlow:       ['#ff8a1e', '#d03a22'],
+  // The pumpkins standing in the street.  Ordinary sight gets the same cheerful
+  // gourd that hangs beside the doors; the other way of looking gets a dark
+  // thing with a fire in it.  It is the same swap the lamps make into torches
+  // - one look below halfway through the changeover and the other above it,
+  // never a blend, because a pumpkin dissolving into another pumpkin reads as
+  // a rendering fault.
+  pumpkin:        ['#e08a26', '#4a4a4a'],
+  pumpkinLit:     ['#ffb44a', '#6a6a6a'],
+  pumpkinDark:    ['#8f4f12', '#242424'],
+  pumpkinGlow:    ['#ffe27a', '#ff2a12'],
+  pumpkinStalk:   ['#5e7a2a', '#343434'],
   decoCobweb:     ['#c6c6d8', '#9a9a9a'],
   decoSkeleton:   ['#dcdce8', '#c6c6c6'],
   decoBats:       ['#1d1828', '#191919'],

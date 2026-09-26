@@ -5,9 +5,9 @@ import {
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
-import { vampFrame } from './vampart.js';
+import { vampFrame, witchArt } from './artwork.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
-import { drawGround, drawBuilding, drawLamp, lampPositions } from './scenery.js';
+import { drawGround, drawBuilding, drawLamp, lampPositions , drawStreetPumpkin } from './scenery.js';
 
 export { lampPositions };
 
@@ -47,16 +47,34 @@ export function updateCamera(cam, p, dt) {
   if (cam.shake > 0) cam.shake = Math.max(0, cam.shake - dt * 3);
 }
 
-/** Snap the camera so art pixels land on whole screen pixels. */
+/**
+ * The camera gives out two offsets, and which one you use decides whether
+ * things shake.
+ *
+ * `ox` is rounded to a whole pixel and is for the city. Ground tiles and
+ * buildings are rigid bodies made of many parts, and they all have to be
+ * rounded against the same whole number or a window drifts inside its own
+ * facade and a tile opens a seam at its edge.
+ *
+ * `oxf` is the true offset, unrounded, and is for anything alive. A moving
+ * sprite has to be rounded ONCE, from its real position on screen - round the
+ * camera first and round the sprite second and you get two staircases,
+ * stepping on different frames, and their difference is a pixel of shake in
+ * whatever direction the thing is travelling. It cancels out the moment it
+ * stops moving, which is why walking into a wall settles it.
+ *
+ * So: the city rounds through `ox`, the living round through `oxf`, and the
+ * vampire holds still while the street scrolls under him.
+ */
 function camOrigin(cam) {
   const z = cam.z;
-  let ox = Math.round((VIEW_W / 2 - cam.x * z));
-  let oy = Math.round((VIEW_H / 2 - cam.y * z));
+  let oxf = VIEW_W / 2 - cam.x * z;
+  let oyf = VIEW_H / 2 - cam.y * z;
   if (cam.shake > 0) {
-    ox += Math.round((Math.random() - 0.5) * 10 * cam.shake);
-    oy += Math.round((Math.random() - 0.5) * 10 * cam.shake);
+    oxf += Math.round((Math.random() - 0.5) * 10 * cam.shake);
+    oyf += Math.round((Math.random() - 0.5) * 10 * cam.shake);
   }
-  return { ox, oy, z };
+  return { ox: Math.round(oxf), oy: Math.round(oyf), oxf, oyf, z };
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +110,11 @@ function drawSprite(ctx, cv, sx, sy, alpha) {
   // the people are still pixel art and are not to be interpolated into soup
   ctx.imageSmoothingEnabled = false;
   if (alpha < 1) ctx.globalAlpha = alpha;
-  ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - cv.anchorY));
+  // round the position and the anchor apart, never their sum: the anchor is a
+  // fixed property of the sprite and must not drag the rounding of a position
+  // that is moving
+  ctx.drawImage(cv, Math.round(sx) - Math.round(cv.anchorX),
+                Math.round(sy) - Math.round(cv.anchorY));
   ctx.restore();
 }
 
@@ -102,8 +124,8 @@ function drawSprite(ctx, cv, sx, sy, alpha) {
 function swapAt(mix) { return Math.max(0, Math.min(1, (mix - 0.3) / 0.4)); }
 
 function drawPerson(ctx, e, o, t) {
-  const { ox, oy, z } = o;
-  const gx = ox + e.x * z, gy = oy + e.y * z;      // where the feet actually are
+  const { oxf, oyf, z } = o;
+  const gx = oxf + e.x * z, gy = oyf + e.y * z;      // where the feet actually are
   const dir = e.dir || 'down';
   const frame = e.frame === undefined ? -1 : e.frame;
   const scale = PX * z;
@@ -120,7 +142,12 @@ function drawPerson(ctx, e, o, t) {
       drawSprite(ctx, kid, gx, sy, 1);
       drawSprite(ctx, greySprite(kid), gx, sy, MIX.vision);   // drains like any child
     }
-    if (swap > 0) drawSprite(ctx, personSprite(e.spec, dir, -1, scale), gx, sy, swap);
+    if (swap > 0) {
+      // a witch is a drawing; a vampire monster is still built out of code
+      const real = (e.kind === 'witch' && witchArt(scale))
+        || personSprite(e.spec, dir, -1, scale);
+      drawSprite(ctx, real, gx, sy, swap);
+    }
   } else {
     shadow(ctx, gx, gy, z, 9);
     const cv = personSprite(e.spec, dir, frame, scale);
@@ -136,9 +163,9 @@ function drawPerson(ctx, e, o, t) {
 // ---------------------------------------------------------------------------
 export function drawScene(ctx, cam, game) {
   if (LIGHTING) ensureBuffers();
+  const { city, world, player, clock } = game;
   const o = camOrigin(cam);
   const { z } = o;
-  const { city, world, player, clock } = game;
 
   const halfW = VIEW_W / (2 * z) + 64, halfH = VIEW_H / (2 * z) + 64;
   // the ground is cached in fixed square tiles; the blocks standing on it are
@@ -158,7 +185,7 @@ export function drawScene(ctx, cam, game) {
   // candy dropped on the pavement: twists of foil, which is to say the one
   // thing out here that is genuinely shiny
   for (const pile of world.piles) {
-    const sx = o.ox + pile.x * z, sy = o.oy + pile.y * z;
+    const sx = o.oxf + pile.x * z, sy = o.oyf + pile.y * z;
     shadow(ctx, sx, sy, z, 10, 0.3);
     for (let i = 0; i < Math.min(12, pile.amount); i++) {
       const a = (i / 12) * 6.2832 + pile.seed;
@@ -199,6 +226,10 @@ export function drawScene(ctx, cam, game) {
     if (inView(n)) list.push({ y: n.y, fn: () => drawNpc(ctx, n, o, clock.t) });
   }
   for (const c of world.cats) if (inView(c)) list.push({ y: c.y, fn: () => drawCat(ctx, c, o, clock.t) });
+  // a pumpkin sorts by where it stands, so a child behind one is behind it
+  for (const pk of world.pumpkins) {
+    if (inView(pk)) list.push({ y: pk.y, fn: () => drawStreetPumpkin(ctx, pk.x, pk.y, o, pk.seed) });
+  }
   list.push({ y: player.y, fn: () => drawPlayer(ctx, player, o, clock.t) });
   // the smoke sorts on the spot it was struck, not on wherever the bat is now
   if (player.poof > 0) list.push({ y: player.poofY, fn: () => drawPoof(ctx, player, o) });
@@ -210,21 +241,13 @@ export function drawScene(ctx, cam, game) {
   if (DAWN_TINT) drawDawn(ctx, game.clock);
 }
 
+// A monster gets no marker of any kind.  There used to be a coloured ring on
+// the ground under one, which was a HUD element pretending to be part of the
+// world: what tells you it is not a child is that it has shed the costume,
+// left the pavement, kept its colour and lit its eyes, and that it casts no
+// shadow at all - the empty ground under it is the tell.
 function drawNpc(ctx, n, o, t) {
   drawPerson(ctx, { ...n, dir: 'down', frame: -1 }, o, t);
-  const ring = swapAt(MIX.vision);
-  if (ring <= 0) return;
-  // no shadow, but a faint ring of nothing-in-particular on the ground it is
-  // not standing on.  Readable once you know to look for it.
-  const { ox, oy, z } = o;
-  ctx.save();
-  ctx.globalAlpha = (0.20 + 0.08 * Math.sin(t * 3 + n.bob)) * ring;
-  ctx.strokeStyle = n.spec.glow;
-  ctx.lineWidth = Math.max(1, 2 * z);
-  ctx.beginPath();
-  ctx.ellipse(ox + n.x * z, oy + n.y * z, 12 * z, 5 * z, 0, 0, 6.2832);
-  ctx.stroke();
-  ctx.restore();
 }
 
 // Cats are a thing of ordinary sight.  The other way of looking does not
@@ -233,8 +256,8 @@ function drawNpc(ctx, n, o, t) {
 function drawCat(ctx, c, o, t) {
   const a = 1 - MIX.vision;
   if (a <= 0.02) return;
-  const { ox, oy, z } = o;
-  const sx = ox + c.x * z, sy = oy + c.y * z;
+  const { oxf, oyf, z } = o;
+  const sx = oxf + c.x * z, sy = oyf + c.y * z;
   shadow(ctx, sx, sy, z, 7, 0.28 * a);
   drawSprite(ctx, catSprite(c.used ? '#6a6a72' : c.eye, PX * z), sx, sy, a);
 }
@@ -251,7 +274,7 @@ const POOF_SMOKE = ['#847c96', '#a79fba', '#cbc4da'];   // back to front
 const POOF_PUFFS = 11;
 
 function drawPoof(ctx, p, o) {
-  const { ox, oy, z } = o;
+  const { oxf: ox, oyf: oy, z } = o;
   const u = Math.max(0, Math.min(1, 1 - p.poof / BAT_POOF));
   // Still travelling when its time is up.  It does not ease to a halt, thin
   // out or shrink away - all of those are fading by another name.  It is one
@@ -287,7 +310,7 @@ function drawPoof(ctx, p, o) {
 }
 
 function drawPlayer(ctx, p, o, t) {
-  const { ox, oy, z } = o;
+  const { oxf: ox, oyf: oy, z } = o;
   const lift = batLift(p);
   // knocked back: a hard shove away from whatever hit you, then a little hop
   // as the vampire picks itself up and pretends that did not happen.
@@ -301,26 +324,22 @@ function drawPlayer(ctx, p, o, t) {
   const sx = gx + p.bumpX * recoil * z;
   const sy = gy + p.bumpY * recoil * z;
 
+  // He has a shadow like everybody else and nothing else under him.  The
+  // purple ring that used to mark him is gone: you know which one you are.
   shadow(ctx, gx, gy, z, lift > 0 ? 7 : 10, lift > 0 ? 0.22 : 0.4);
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-  ctx.strokeStyle = '#9d5cff';
-  ctx.lineWidth = Math.max(1, 2 * z);
-  ctx.beginPath();
-  ctx.ellipse(gx, gy, 13 * z, 6 * z, 0, 0, 6.2832);
-  ctx.stroke();
-  ctx.restore();
 
   let cv;
   if (p.bat > 0) {
     cv = batSprite(Math.floor(p.anim * 9) % 2, PX * z);
-    ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - (lift + hop) * z - cv.anchorY));
+    ctx.drawImage(cv, Math.round(sx) - Math.round(cv.anchorX),
+                  Math.round(sy - (lift + hop) * z) - Math.round(cv.anchorY));
   } else {
     // his own artwork if it has loaded, the drawn placeholder until it has.
     // The sheet faces right, so walking left is the same frame mirrored.
     cv = vampFrame(p.dir === 'up', p.frame, p.faceX < -0.1, PX * z)
       || personSprite(PLAYER_SPEC, p.dir, p.frame, PX * z);
-    ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - hop * z - cv.anchorY));
+    ctx.drawImage(cv, Math.round(sx) - Math.round(cv.anchorX),
+                  Math.round(sy - hop * z) - Math.round(cv.anchorY));
   }
 
   // the hit itself: a short white star on the side that got shoved

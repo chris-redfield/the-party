@@ -6,7 +6,8 @@ You know it is happening. You know it is in this city. You do not know which
 door. It is midnight. At 6:00 AM the sun comes up and turns you into a small
 pile of something the street sweeper will not even notice.
 
-Six in-game hours run in **twelve real minutes**.
+Six in-game hours run in **six real minutes** — one real second is one
+game minute.
 
 ## Running it
 
@@ -88,6 +89,29 @@ you for a moment, and they shout at you about it.
 
 You cannot tell anything from looking. Every figure on the street is the same
 height with the same too-big head, and some of them are not children.
+
+**Somebody has left pumpkins out.** They stand on the pavement and on the
+painted crossings, they are about as big as a trick-or-treater, and they are
+solid. They are also the only obstacle in the game that does not want
+anything from you: walking into one costs no blood, knocks nothing out of your
+hands and says nothing. It is in the way, you go round, and the wings clear it
+like they clear everybody else.
+
+**None of them ever takes a whole path.** One on the pavement stands off to
+one side of it and one on a crossing hugs an edge, half out on the asphalt
+where nobody could walk anyway, so there is always a lane past. That is
+load-bearing, not politeness: the pavement has to stay one connected piece or
+part of the city becomes unreachable on foot, and a crossing is only
+`CROSS_W` wide and is the only way over a road. Flood-filling the walkable
+city on an 8-pixel grid, over four different nights, says the pumpkins take
+about 2% of the pavement and leave it in exactly one piece.
+
+**And they are not cute in the other light.** In ordinary sight a pumpkin is
+the same cheerful gourd that sits beside the doors, lit from inside, grinning.
+Once the changeover is half done it is a dark thing with a fire in it and a
+mouth full of teeth — a hard swap at the halfway mark, the same trick the
+street lamps play when they turn out to have been torches all along, because a
+pumpkin dissolving into another pumpkin reads as a rendering fault.
 
 **Wrong doors are the only place candy comes from.** Children never give you
 any; they want yours. Knock on a house that is not the party and somebody hands
@@ -210,15 +234,25 @@ is how big the word goes.
 **There are no digits on the clock, because there is no clock.** The only thing
 telling you how much night is left stands in the top right corner: an hourglass
 made out of bone, with a skull for a cap and the sand running out between its
-teeth. The top bulb is the night — violet sand, a few stars in it, and a moon
+teeth. The top bulb is the night — grey sand, a few stars in it, and a moon
 standing in the middle. The bottom bulb is what the night turns into.
+
+**There is no colour in it except the sun.** The bone, the glass, the sand,
+the stars, the moon being ground down, the grains coming through the neck and
+the cracks that open at the end are all greys. The sun is the one hue on it,
+and it is `#cf1206` — the exact red of the screen it puts you on, because it
+is the same thing. It is the only colour in that corner of the screen, so
+your eye goes to it, which is what a clock you cannot read has instead of
+digits. (The skull's sockets are allowed the same red in the last hour: that
+is not a colour of their own, it is the sun's light in them.)
 
 It is the same sand. The level in the top falls past the moon and eats it away
 grain by grain, and those grains come through the neck and build a sun back up
 in the bottom, from the tips of its lowest rays to the top of the disc. Half a
 moon and half a sun is three in the morning. No moon and a whole sun is 6:00
-AM. In the last hour the glass starts to crack, the sun goes white, and the
-skull's eye sockets catch the light that is coming for you.
+AM. In the last hour the glass starts to crack, the sun burns up from
+its red to a bright one, and the skull's eye sockets catch the light that is
+coming for you.
 
 `GLASS_UNIT` in `src/config.js` is how big one of its art pixels is, and
 `GLASS_CLOCK_TEXT` puts the digits back underneath it if you want them.
@@ -396,7 +430,10 @@ it accelerates the way a falling thing does, covers for a beat and fades out,
 so nothing has to be timed against it. `REVEAL` is how far the changeover has
 to have gone before a monster drops its costume - the picture and the `[E]`
 prompt read the same number, so you can never talk to something that still
-looks like a child. `MONSTERS_PER_BLOCK` is how many of them are out there, `LIAR_CHANCE` how
+looks like a child. `PUMPKINS_PER_BLOCK` and `PUMPKIN_CROSSING_CHANCE` are how many pumpkins are
+in your way, `PUMPKIN_R` how big one is and `PUMPKIN_BLOCK` how close you may
+get to it, with `PUMPKIN_LAT` / `PUMPKIN_CROSS_LAT` the offsets that keep a
+lane open past them. `MONSTERS_PER_BLOCK` is how many of them are out there, `LIAR_CHANCE` how
 many of those are lying to you (0 gives you back the old honest city) and
 `MAX_TIPS` how many cards a night will hand over at all;
 `BUMP_BLOOD`, `BUMP_STAGGER`, `BUMP_ANIM` and `BUMP_SHAKE` tune what it feels
@@ -444,8 +481,9 @@ src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
 src/audio.js        procedural sound, and the one recorded thing there is:
                     the soundtrack in assets/ost, streamed and looped
-src/sprites.js      PLACEHOLDER ART for everybody but the player.
-src/vampart.js      the player, who is a real drawing off a sheet in assets/
+src/sprites.js      PLACEHOLDER ART for everybody drawn out of code.
+src/artwork.js      the two who are not: the vampire and the witches, cut
+                    out of real drawings in assets/
 src/input.js
 src/main.js         loop and wiring
 ```
@@ -456,12 +494,32 @@ replace `personSprite`, `catSprite` and `batSprite` with something that returns
 a canvas or image with `anchorX` / `anchorY` set to the sprite's feet, and
 nothing else has to change.
 
-**The vampire himself is the exception, and is not drawn out of code.** He is a
-real drawing — `assets/vamp-frente e verso-01.png`, a sheet of eight: column 0
+**Two characters are the exception and are not drawn out of code**: the
+vampire you play and the witches you find. They are real drawings, and
+`src/artwork.js` cuts them out of their sheets and puts them on screen.
+
+The vampire is `assets/vamp-frente e verso-01.png`, a sheet of eight: column 0
 is his back, column 1 his front, row 0 standing still and rows 1–3 the walk.
-`src/vampart.js` cuts it up and puts it on screen, and `VAMP_BOX` in that file
-is how tall he stands (33 art pixels, a little over the 28 everybody else is —
-he is the one adult out there and the cape needs the room).
+`VAMP_BOX` is how tall he stands (33 art pixels, a little over the 28
+everybody else is — he is the one adult out there and the cape needs the
+room).
+
+The walk is the sheet's own rows in the order the sheet lays them out — row 0
+standing still, rows 1, 2 and 3 the three beats of the cycle. Nothing is
+mirrored to make a pose, nothing is skipped and nothing is re-ordered; the
+mirror is only ever for facing left. If a frame ever looks wrong, the fix
+belongs in the sheet, not in the code that plays it.
+
+The witches are `assets/party-witch-01.png`, which is one drawing of one pose,
+facing you — and that is all a witch needs, because a monster stands on that
+pavement all night and never takes a step. `WITCH_BOX` is her height. The two sheets are drawn
+at different sizes, so the boxes are what put the characters in proportion to
+each other rather than in proportion to whatever the files were exported at:
+she comes out a little under the vampire, level with the monsters she replaces
+and a head over the children. She is
+only ever seen in vampire vision: out of it she is wearing a child's costume
+like every other monster, and that costume is still built out of code. She
+keeps her colour when the street drains, the way every monster does.
 
 Two things about the sheet decide how that file works. Its background is white
 **and so is his face**, so keying white out would punch a hole through his
@@ -469,7 +527,16 @@ head: the transparency is flooded in from the edges of each cell instead, and
 white the outline encloses survives. And the eight drawings are not aligned to
 each other, so each is trimmed to its own ink and stood on the pavement by its
 own feet — all scaled by the same amount, off the tallest cell, so he does not
-change size between frames. The drawings face right, so walking left is the
+change size between frames.
+
+**Each frame is registered on his head, not on the middle of its own box.**
+That is not fussiness: in a stride the legs reach out to one side and take the
+bounding box with them, so a frame centred on its box swings the whole
+character sideways every step — the head lurches, the legs stay put, and it
+reads as a shake. The head is drawn in the same place in every frame of the
+sheet, to a third of a pixel, so the top of the figure is what each frame
+hangs from. Vertically he still stands on the bottom of his own ink, because
+what should hold still down there is the ground. The drawings face right, so walking left is the
 same frame mirrored; walking north shows his back and everything else shows his
 front. Nothing is generated into a file: the sheet stays the only copy of the
 art, and re-exporting it is all it takes to change him. Until it loads he is
@@ -509,5 +576,6 @@ PARTY.vision()     // 30 seconds of vampire vision (or vision(n) for n)
 PARTY.win()        // knock on the right door
 PARTY.restart()    // a fresh night
 PARTY.bench()      // ms a frame of city costs
+PARTY.isWalkable(x, y)   // for invariant checks: may a vampire stand here?
 PARTY.game         // everything
 ```

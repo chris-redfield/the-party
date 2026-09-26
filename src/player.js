@@ -101,8 +101,10 @@ export function updatePlayer(p, dt, input) {
       p.faceX = vx; p.faceY = vy;
       p.dir = vy < -0.5 ? 'up' : 'down';
       p.anim += dt;
-      // three frames in the walk now: stride, pass, other stride
-      p.frame = Math.floor(p.anim * 7.5) % 3;
+      // Just a step counter - it is the sprite that knows how many poses
+      // there are to cycle through, and they are not the same number for the
+      // drawn vampire and the placeholder behind him.
+      p.frame = Math.floor(p.anim * 6);
       p.stepTimer -= dt;
     } else {
       p.frame = -1;

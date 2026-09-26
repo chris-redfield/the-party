@@ -1,13 +1,14 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC } from './config.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
 import { newGame, updateGame, knock, bringTipForward, giveTip } from './game.js';
+import { isWalkable } from './city.js';
 import { FACT_KEYS } from './hints.js';
 import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
 import { drawHud, drawTitle, drawEnd, drawPause, cardAt, tipVotes } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic } from './audio.js';
 import { loadDeathFonts } from './deathtype.js';
-import { loadVampArt } from './vampart.js';
+import { loadArtwork } from './artwork.js';
 
 const canvas = document.getElementById('game');
 canvas.width = VIEW_W; canvas.height = VIEW_H;
@@ -26,9 +27,10 @@ fit();
 // anything can be drawn with it.  Nothing waits on this: it is wanted minutes
 // into a night at the earliest, and until it lands the screen sets in serif.
 loadDeathFonts();
-// The player's own artwork, cut out of its sheet.  Nothing waits on this
-// either: until it lands he is drawn with the placeholder sprite.
-loadVampArt();
+// The drawn characters - the vampire and the witches - cut out of their
+// sheets.  Nothing waits on this either: until they land, both are drawn with
+// the placeholder sprites.
+loadArtwork();
 
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
@@ -174,7 +176,11 @@ window.PARTY = {
     return game.tips.map(t =>
       `${t.lie ? 'LIE ' : 'TRUE'}  ${t.key} = ${t.value}  (from ${t.from})`);
   },
-  skipTo(min) { game.clock.t = min / 360 * 720; },
+  // off MIN_PER_SEC, not off a hardcoded night: the night has been six real
+  // minutes and twelve, and this has to follow it
+  /** for headless invariant checks - is this world point walkable? */
+  isWalkable,
+  skipTo(min) { game.clock.t = min / MIN_PER_SEC; },
   vision(sec) { game.vision = sec === undefined ? VISION_SECONDS : sec; },
   win() { knock(game, game.city.party); },
   /** ms a frame of city costs - the scenery is the expensive half. */

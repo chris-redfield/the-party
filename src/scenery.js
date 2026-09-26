@@ -17,7 +17,7 @@
 // city to grey and sets the lit things burning: every colour below comes out
 // of `C`, and the textures tint themselves against whatever is under them.
 // ---------------------------------------------------------------------------
-import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS } from './config.js';
+import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R } from './config.js';
 import { makeRng } from './rng.js';
 import { C, MIX, lerpHex } from './palette.js';
 
@@ -602,6 +602,84 @@ export function drawGround(ctx, o, tiles, city) {
 
 // ---------------------------------------------------------------------------
 // Decorations - the thing hanging by the door, which is also a clue
+// ---------------------------------------------------------------------------
+// The pumpkins in the street
+// ---------------------------------------------------------------------------
+// Not a decoration hung beside a door - a thing standing on the ground that
+// you have to walk around.  It is drawn out here with the people rather than
+// baked into the ground tiles, because a child standing behind one has to be
+// hidden by it.
+//
+// It has two faces and no blend between them.  Below halfway through the
+// changeover it is the same cheerful gourd that sits by the doors; above it,
+// it is a dark thing with a fire inside and a mouth full of teeth.  Same trick
+// the street lamps play when they turn out to have been torches all along.
+const PUMPKIN_SINISTER = 0.5;
+
+export function drawStreetPumpkin(ctx, px, py, o, seed) {
+  const { ox, oy, z } = o;
+  const sx = ox + px * z, sy = oy + py * z;
+  const r = PUMPKIN_R * z;
+  const evil = MIX.scene >= PUMPKIN_SINISTER;
+  const wob = ((seed % 7) - 3) * 0.012;            // no two sit quite the same
+
+  // the dark it puts on the pavement
+  ctx.fillStyle = C.coreShadow;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, r * 1.02, r * 0.3, 0, 0, 6.2832);
+  ctx.fill();
+
+  const cy = sy - r * 0.76;                        // it sits ON the ground
+  // stalk first, so the body covers where it goes in
+  ctx.fillStyle = C.pumpkinStalk;
+  ctx.beginPath();
+  ctx.moveTo(sx - r * 0.1, cy - r * 0.8);
+  ctx.lineTo(sx + r * 0.12, cy - r * 0.86);
+  ctx.lineTo(sx + r * 0.2, cy - r * 1.24);
+  ctx.lineTo(sx - r * 0.02, cy - r * 1.18);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = C.pumpkinDark;
+  ctx.beginPath(); ctx.ellipse(sx, cy, r, r * 0.88, wob, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = C.pumpkin;
+  ctx.beginPath(); ctx.ellipse(sx, cy, r * 0.88, r * 0.8, wob, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = C.pumpkinLit;
+  ctx.beginPath();
+  ctx.ellipse(sx - r * 0.3, cy - r * 0.08, r * 0.3, r * 0.66, wob, 0, 6.2832);
+  ctx.fill();
+  ctx.fillStyle = C.pumpkinDark;                   // the ribs
+  for (const d of [-0.62, 0.62]) {
+    ctx.beginPath();
+    ctx.ellipse(sx + d * r * 0.84, cy, r * 0.09, r * 0.72, wob, 0, 6.2832);
+    ctx.fill();
+  }
+
+  // --- the face -------------------------------------------------------------
+  ctx.fillStyle = C.pumpkinGlow;
+  const tri = (pts) => {
+    ctx.beginPath();
+    ctx.moveTo(sx + pts[0] * r, cy + pts[1] * r);
+    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(sx + pts[i] * r, cy + pts[i + 1] * r);
+    ctx.closePath();
+    ctx.fill();
+  };
+  if (!evil) {
+    // cute: two triangles looking up, and a friendly gap-toothed grin
+    tri([-0.58, -0.30, -0.18, -0.12, -0.58, 0.02]);
+    tri([0.58, -0.30, 0.18, -0.12, 0.58, 0.02]);
+    tri([-0.52, 0.26, -0.20, 0.50, 0.08, 0.28, 0.40, 0.50, 0.52, 0.26, 0.20, 0.16, -0.20, 0.16]);
+  } else {
+    // sinister: the eyes have come down at the outside, the mouth has gone
+    // wide and every tooth in it is showing
+    tri([-0.66, -0.40, -0.12, -0.06, -0.60, 0.10]);
+    tri([0.66, -0.40, 0.12, -0.06, 0.60, 0.10]);
+    tri([-0.14, -0.22, 0.14, -0.22, 0, 0.02]);             // a nose, of sorts
+    tri([-0.66, 0.22, -0.46, 0.52, -0.28, 0.24, -0.10, 0.56, 0.08, 0.24,
+         0.28, 0.54, 0.46, 0.24, 0.66, 0.46, 0.60, 0.14, -0.62, 0.14]);
+  }
+}
+
 // ---------------------------------------------------------------------------
 function drawDeco(ctx, kind, sx, sy, z) {
   ctx.save();

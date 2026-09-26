@@ -116,10 +116,16 @@ export function drawHud(ctx, game) {
 }
 
 // The whole clock: an hourglass in a panel, with a line of bad news under it.
+// Nothing is written under the glass.  It used to say SUNRISE AT 6:00 AM,
+// which never changed and so told you nothing you did not know by the second
+// time you read it, and THE SKY IS GETTING IDEAS in the last hour, which went
+// with it because it lived in the same two lines.  The last hour announces
+// itself perfectly well without words now: the glass cracks, the sun burns up
+// to its bright red and the skull's sockets light.  The panel hugs the glass.
 const CLOCK_PAD = 12;
 const CLOCK_W = GLASS_W + CLOCK_PAD * 2;
-const CLOCK_CAPTION = 46 + (GLASS_CLOCK_TEXT ? 24 : 0);
-const CLOCK_H = GLASS_H + CLOCK_PAD + CLOCK_CAPTION;
+// room under it only if the digits have been switched back on
+const CLOCK_H = GLASS_H + CLOCK_PAD * 2 + (GLASS_CLOCK_TEXT ? 26 : 0);
 
 function drawClock(ctx, clock, panic) {
   const x = VIEW_W - 16 - CLOCK_W, y = 16;
@@ -127,19 +133,14 @@ function drawClock(ctx, clock, panic) {
   drawHourglass(ctx, x + CLOCK_PAD, y + CLOCK_PAD,
                 clock.minutes / NIGHT_MINUTES, clock.t, panic);
 
-  const hot = panic && Math.floor(clock.t * 4) % 2;
-  let ty = y + CLOCK_PAD + GLASS_H + 18;
-  ctx.textAlign = 'center';
   if (GLASS_CLOCK_TEXT) {
+    const hot = panic && Math.floor(clock.t * 4) % 2;
+    ctx.textAlign = 'center';
     ctx.font = FONT(20);
     ctx.fillStyle = panic ? (hot ? '#ff5a4a' : '#ffb24a') : '#f0e6ff';
-    ctx.fillText(clockText(clock.minutes), x + CLOCK_W / 2, ty);
-    ty += 24;
+    ctx.fillText(clockText(clock.minutes), x + CLOCK_W / 2,
+                 y + CLOCK_PAD + GLASS_H + 20);
   }
-  ctx.font = FONT(11);
-  ctx.fillStyle = panic ? (hot ? '#ff5a4a' : '#ffb24a') : '#b8a8d0';
-  const caption = panic ? ['THE SKY IS', 'GETTING IDEAS'] : ['SUNRISE AT', '6:00 AM'];
-  caption.forEach((line, i) => ctx.fillText(line, x + CLOCK_W / 2, ty + i * 14));
 }
 
 function drawVision(ctx, game) {
