@@ -1,11 +1,20 @@
 import { DISTRICTS } from './city.js';
 
 // The facts that, taken together, pin down exactly one door in the city.
-// Every block has one door, so district + avenue + street is already an
-// address; the decoration is how you recognise the place if you stumble on it
-// before you know where you are.  (Door colour used to be a fact here.  Now
-// every door is the same red, so it stopped telling you anything.)
-export const FACT_KEYS = ['district', 'col', 'row', 'deco'];
+//
+// No two blocks share a south-west corner, so the avenue a block backs onto
+// plus the street its doors open onto is a unique address - but a block may
+// carry a row of houses and so several doors, and the decoration is what
+// picks one of them out.  That is why no two doors on the same block hang
+// the same thing beside them (src/city.js): the four facts together always
+// leave exactly one door standing.  (Door colour used to be a fact here.
+// Now every door is the same red, so it stopped telling you anything.)
+//
+// Avenues and streets are the roads the cut left behind, numbered from the
+// west and from the north.  There are a few dozen of each rather than ten,
+// because the city is not ruled into ten columns any more - which is why the
+// minimap prints the address of the block you are standing on.
+export const FACT_KEYS = ['district', 'avenue', 'street', 'deco'];
 
 export function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
@@ -15,8 +24,8 @@ export function ordinal(n) {
 export function factText(key, party) {
   switch (key) {
     case 'district': return `it is somewhere in ${DISTRICTS[party.districtIdx].name}`;
-    case 'col': return `it is on ${ordinal(party.cx + 1)} Avenue`;
-    case 'row': return `it is on ${ordinal(party.cy + 1)} Street`;
+    case 'avenue': return `it is on ${ordinal(party.block.avenue)} Avenue`;
+    case 'street': return `it is on ${ordinal(party.block.street)} Street`;
     case 'deco': return `${party.deco.name} hangs by the door`;
   }
   return '';
@@ -38,8 +47,8 @@ export function cardFact(key, party) {
 export function shortFact(key, party) {
   switch (key) {
     case 'district': return DISTRICTS[party.districtIdx].name;
-    case 'col': return `${ordinal(party.cx + 1)} Ave`;
-    case 'row': return `${ordinal(party.cy + 1)} St`;
+    case 'avenue': return `${ordinal(party.block.avenue)} Ave`;
+    case 'street': return `${ordinal(party.block.street)} St`;
     case 'deco': return party.deco.name;
   }
   return '';
@@ -79,3 +88,8 @@ export function exhaustedLine(rng, kind, party, dist) {
 }
 
 export function catLine(rng) { return rng.pick(CAT_LINES); }
+
+/** "12th Ave & 7th St" - the address of any block, printed under the map. */
+export function addressOf(block) {
+  return `${ordinal(block.avenue)} Ave & ${ordinal(block.street)} St`;
+}

@@ -1,10 +1,10 @@
 import {
-  VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, GRID, CELL,
+  VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, WORLD,
   VISION_SECONDS, VISION_WARN, GLASS_CLOCK_TEXT,
 } from './config.js';
 import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
-import { DISTRICTS } from './city.js';
-import { shortFact, cardFact, FACT_KEYS } from './hints.js';
+import { DISTRICTS, blockAt } from './city.js';
+import { shortFact, cardFact, addressOf, FACT_KEYS } from './hints.js';
 
 const FONT = (px, bold = true) =>
   `${bold ? 'bold ' : ''}${px}px "Courier New", ui-monospace, monospace`;
@@ -187,11 +187,11 @@ const CARD_STOCK = '#efe9e2';
 const CARD_EDGE = '#14121c';
 const SUITS = {
   district: ['\u2660', '#1b1622'],
-  col: ['\u2666', '#b3122b'],
-  row: ['\u2663', '#1b1622'],
+  avenue: ['\u2666', '#b3122b'],
+  street: ['\u2663', '#1b1622'],
   deco: ['\u2665', '#b3122b'],
 };
-const CARD_NAME = { district: 'DISTRICT', col: 'AVENUE', row: 'STREET', deco: 'THE DOOR' };
+const CARD_NAME = { district: 'DISTRICT', avenue: 'AVENUE', street: 'STREET', deco: 'THE DOOR' };
 
 function cardShape(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -345,59 +345,64 @@ function drawClues(ctx, knowledge, city) {
 }
 
 // ---------------------------------------------------------------------------
-export function candidateBlocks(knowledge, city) {
-  const out = [];
-  for (let cy = 0; cy < GRID; cy++) {
-    for (let cx = 0; cx < GRID; cx++) {
-      if (knowledge.col && cx !== city.party.cx) continue;
-      if (knowledge.row && cy !== city.party.cy) continue;
-      if (knowledge.district) {
-        const d = DISTRICTS[city.party.districtIdx];
-        if (cx < d.cols[0] || cx > d.cols[1] || cy < d.rows[0] || cy > d.rows[1]) continue;
-      }
-      out.push({ cx, cy });
-    }
-  }
-  return out;
+// Which doors are still possible.  A block may hold several of them, so the
+// address narrows the map to one block and the decoration picks the door on
+// it - which is why no two doors on a block hang the same thing.
+export function candidateDoors(knowledge, city) {
+  const p = city.party;
+  return city.doors.filter((d) => {
+    if (knowledge.avenue && d.block.avenue !== p.block.avenue) return false;
+    if (knowledge.street && d.block.street !== p.block.street) return false;
+    if (knowledge.district && d.block.district !== p.districtIdx) return false;
+    if (knowledge.deco && d.deco.key !== p.deco.key) return false;
+    return true;
+  });
 }
 
+// The map is the city shrunk, not a grid of squares: every block is drawn at
+// the size and in the place it actually has, which is the only way to read a
+// city that was cut rather than ruled.  It also prints the address of the
+// block you are standing on, because there is no other way to tell 11th
+// Avenue from 12th once the avenues are not evenly spaced.
 function drawMinimap(ctx, game) {
   const { city, player, knowledge } = game;
-  const S = 17, pad = 8;
-  const size = GRID * S + pad * 2;
-  const x = VIEW_W - size - 16, y = VIEW_H - size - 16;
-  panel(ctx, x, y, size, size + 22);
+  const MAP = 160, pad = 8;
+  const size = MAP + pad * 2;
+  // two lines under the map now, so it sits high enough for both of them
+  const x = VIEW_W - size - 16, y = VIEW_H - size - 54;
+  panel(ctx, x, y, size, size + 38);
+  const S = MAP / WORLD;
+  const MX = (wx) => x + pad + wx * S;
+  const MY = (wy) => y + pad + wy * S;
 
-  const cands = candidateBlocks(knowledge, city);
-  const candSet = new Set(cands.map(c => c.cy * GRID + c.cx));
+  const cands = candidateDoors(knowledge, city);
+  const candSet = new Set(cands.map(d => d.block.id));
 
-  for (let cy = 0; cy < GRID; cy++) {
-    for (let cx = 0; cx < GRID; cx++) {
-      const bx = x + pad + cx * S, by = y + pad + cy * S;
-      const isCand = candSet.has(cy * GRID + cx);
-      ctx.fillStyle = isCand ? '#33234f' : '#17161f';
-      ctx.fillRect(bx + 1, by + 1, S - 2, S - 2);
-      const block = city.blockAt(cx, cy);
-      if (block.door.tried) {
-        ctx.fillStyle = 'rgba(200,70,70,0.34)';
-        ctx.fillRect(bx + 1, by + 1, S - 2, S - 2);
-        ctx.strokeStyle = '#d0424a'; ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(bx + 3, by + 3); ctx.lineTo(bx + S - 3, by + S - 3);
-        ctx.moveTo(bx + S - 3, by + 3); ctx.lineTo(bx + 3, by + S - 3);
-        ctx.stroke();
-      }
+  ctx.fillStyle = '#0d0c14';                       // the roads, underneath
+  ctx.fillRect(x + pad, y + pad, MAP, MAP);
+  for (const b of city.blocks) {
+    const bx = MX(b.x0), by = MY(b.y0);
+    const bw = Math.max(1, (b.x1 - b.x0) * S - 1), bh = Math.max(1, (b.y1 - b.y0) * S - 1);
+    ctx.fillStyle = candSet.has(b.id) ? '#33234f' : '#17161f';
+    ctx.fillRect(bx, by, bw, bh);
+    if (b.doors.every(d => d.tried)) {
+      ctx.fillStyle = 'rgba(200,70,70,0.34)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = '#d0424a'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(bx + 1, by + 1); ctx.lineTo(bx + bw - 1, by + bh - 1);
+      ctx.moveTo(bx + bw - 1, by + 1); ctx.lineTo(bx + 1, by + bh - 1);
+      ctx.stroke();
     }
   }
   if (knowledge.marked) {
-    const bx = x + pad + city.party.cx * S, by = y + pad + city.party.cy * S;
+    const b = city.party.block;
     ctx.strokeStyle = '#7aff9a'; ctx.lineWidth = 2;
-    ctx.strokeRect(bx, by, S, S);
+    ctx.strokeRect(MX(b.x0) - 1, MY(b.y0) - 1, (b.x1 - b.x0) * S + 1, (b.y1 - b.y0) * S + 1);
   }
   // player
-  const px = x + pad + (player.x / CELL) * S, py = y + pad + (player.y / CELL) * S;
   ctx.fillStyle = '#ffd24a';
-  ctx.fillRect(px - 2, py - 2, 5, 5);
+  ctx.fillRect(MX(player.x) - 2, MY(player.y) - 2, 5, 5);
 
   // while the vision holds, the monsters within earshot show up as pinpricks
   if (game.visionMix > 0.1) {
@@ -405,7 +410,7 @@ function drawMinimap(ctx, game) {
     for (const n of game.world.npcs) {
       if (Math.hypot(n.x - player.x, n.y - player.y) > 1500) continue;
       ctx.fillStyle = n.kind === 'witch' ? '#7aff9a' : '#ff5a4a';
-      ctx.fillRect(x + pad + (n.x / CELL) * S - 1, y + pad + (n.y / CELL) * S - 1, 3, 3);
+      ctx.fillRect(MX(n.x) - 1, MY(n.y) - 1, 3, 3);
     }
     ctx.globalAlpha = 1;
   }
@@ -413,7 +418,9 @@ function drawMinimap(ctx, game) {
   ctx.textAlign = 'center';
   ctx.font = FONT(11);
   ctx.fillStyle = '#9a8ab8';
-  ctx.fillText(`${cands.length} BLOCK${cands.length === 1 ? '' : 'S'} LEFT`, x + size / 2, y + size + 14);
+  ctx.fillText(`${cands.length} DOOR${cands.length === 1 ? '' : 'S'} LEFT`, x + size / 2, y + size + 14);
+  ctx.fillStyle = '#7a6f92';
+  ctx.fillText(addressOf(blockAt(player.x, player.y)).toUpperCase(), x + size / 2, y + size + 30);
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +497,7 @@ export function drawEnd(ctx, game, t) {
     `candy:  ${game.player.candy} pieces carried`,
     `clues:  ${FACT_KEYS.filter(k => game.knowledge[k]).length} of ${FACT_KEYS.length}`,
     `party:  ${DISTRICTS[game.city.party.districtIdx].name}, ` +
-      `${game.city.party.cx + 1} Ave & ${game.city.party.cy + 1} St`,
+      addressOf(game.city.party.block),
     `door:   the one with ${game.city.party.deco.name}`,
   ];
   stats.forEach((s, i) => ctx.fillText(s, VIEW_W / 2, 440 + i * 26));

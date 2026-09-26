@@ -3,31 +3,71 @@
 // ---------------------------------------------------------------------------
 
 // --- world geometry (all values in "world pixels") -------------------------
-// A city block cell is laid out like this (cell-local coordinates):
+// The city is not a grid.  It is one rectangle cut in half over and over -
+// binary space partitioning - and every cut leaves a road behind it.  What
+// survives uncut is a block: a building core with a sidewalk ring around it,
+// and a road on all four sides.  Blocks therefore come in every size between
+// LOT_MIN and roughly twice that, and the roads inherit the shape of the
+// tree.  See the top of src/city.js.
 //
-//   0 .......128 .....192 .................448 .....512
-//   |  road   |sidewalk|   building core     |sidewalk|
+//   +--------------------------------------------------+
+//   |  road                                            |
+//   |   +------------------------+   +--------------+  |
+//   |   | walk                   |   |              |  |
+//   |   |   +----------------+   |   |   a smaller  |  |
+//   |   |   | building core  |   |   |   block      |  |
+//   |   |   +----------------+   |   |              |  |
+//   |   +------------------------+   +--------------+  |
 //
-// The road band sits on the LEFT and TOP edge of every cell, so it is shared
-// with the neighbouring cell.  The sidewalk forms a closed ring around the
-// building core, which is what the vampire walks on.
-export const CELL = 512;
-export const GRID = 10;              // 10 x 10 blocks
-export const WORLD = CELL * GRID;    // 5120 x 5120
-export const ROAD = 128;
-export const WALK = 64;              // sidewalk band width
-export const CORE0 = ROAD + WALK;    // 192  - core starts
-export const CORE1 = CELL - WALK;    // 448  - core ends
-export const RING0 = ROAD;           // 128  - sidewalk ring outer edge
-export const RING1 = CELL;           // 512
-export const CROSS0 = 296;           // crosswalk strip across a road
-export const CROSS1 = 344;
+export const WORLD = 5120;           // the city is 5120 x 5120
+export const WALK = 64;              // sidewalk band, inside every lot edge
 
-// ring centre-line, used to path NPCs around a block
-export const RA = RING0 + WALK / 2;  // 160
-export const RB = RING1 - WALK / 2;  // 480
-export const RLEN = RB - RA;         // 320
-export const RPERIM = RLEN * 4;      // 1280
+// The ground is cached in fixed square tiles.  This is a rendering lattice
+// and nothing else - no block, road or door is aligned to it.
+export const TILE = 512;
+export const TILE_N = WORLD / TILE;
+
+// --- the cut ---------------------------------------------------------------
+// CITY_SEED is deliberately a constant.  The city is generated from scratch
+// on every reload, and comes out the same city every time; `?citySeed=` in
+// the URL will cut you a different one.  The night's own seed decides what
+// goes *in* it - which door is the party, what hangs beside each one.
+export const CITY_SEED = 0x50415254;   // "PART"
+export const CITY_RIM = 132;           // ring road around the whole city
+
+// Cutting the city.  The cut runs deep and leaves small pieces, and then
+// some of them are put back together on the way out - see LOT_MERGE.
+export const LOT_MIN = 240;            // no piece is cut smaller than this
+export const LOT_MAX = 460;            // ... and one bigger than this is cut again
+export const LOT_STOP = 0.10;          // chance of leaving a cuttable piece uncut
+export const LOT_JITTER = 0.9;         // 0 halves every piece, 1 cuts anywhere
+export const LOT_ASPECT = 1.5;         // cut the long way once a piece is this oblong
+// Putting them back.  Coming back up the tree, a cut whose two sides both
+// came out as single pieces may be undone: the road between them is never
+// laid and they become one block, big enough to hold a row of buildings.
+// This is what stops the city reading as a lattice - it is the difference
+// between "every block is a bit different" and "that block is a superblock".
+export const LOT_MERGE = 0.6;
+export const LOT_MERGE_MAX = 1000;     // but nothing merges into a monster
+
+// --- the buildings on a block ----------------------------------------------
+// The same cut again, one level down and with no roads in it: a block's core
+// is divided into plots, and every plot is a building sharing its party walls
+// with the next.  Only the plots along the south edge get a door, because a
+// door in the middle of a block is a door nobody can knock on.
+export const PLOT_MIN = 168;           // narrowest frontage
+export const PLOT_MAX = 400;           // widest before it is divided again
+export const PLOT_DEEP = 208;          // shallowest building
+export const PLOT_DEEP_MAX = 430;
+export const PLOT_STOP = 0.18;
+// Each building carries its own height, so a block of them has a skyline.
+export const WALL_MIN = 72;
+export const WALL_MAX = 108;
+
+// Road width by depth of the cut: the first cuts are avenues the height of
+// the city, the last are lanes a block and a half long.
+export const ROAD_WIDTHS = [176, 152, 128, 112, 96];
+export const CROSS_W = 48;             // width of a painted pedestrian crossing
 
 // --- rendering --------------------------------------------------------------
 export const VIEW_W = 1280;

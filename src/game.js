@@ -1,12 +1,12 @@
 import {
-  CELL, GRID, MIN_PER_SEC, NIGHT_MINUTES, BLOOD_DRAIN, BLOOD_MAX, MANA_MAX,
+  MIN_PER_SEC, NIGHT_MINUTES, BLOOD_DRAIN, BLOOD_MAX, MANA_MAX,
   CANDY_PER_WRONG_DOOR, PUNCH_BLOOD, BUMP_BLOOD, BUMP_STAGGER, BUMP_SHAKE,
   SIM_RADIUS, BASS_RADIUS, VISION_SECONDS, VISION_FADE, VISION_TAPER,
   VISION_BLEED, REVEAL, CAT_TOUCH,
 } from './config.js';
 import { makeRng, hashSeed } from './rng.js';
-import { buildCity, districtOf, ringPoint, isWalkable } from './city.js';
-import { populate, updateKid, updateCat, nearestRingT } from './entities.js';
+import { buildCity, ringPoint, nearestRingT, blockAt, isWalkable } from './city.js';
+import { populate, updateKid, updateCat } from './entities.js';
 import { makePlayer, updatePlayer, tryBat, wantedFollowers, shove } from './player.js';
 import {
   FACT_KEYS, realLine, exhaustedLine, catLine, factText,
@@ -18,22 +18,24 @@ const TALK_REACH = 48;
 const KID_BLOCK = 19;
 const NPC_BLOCK = 20;
 
-export function newGame(seedStr) {
+export function newGame(seedStr, citySeed) {
   const seed = hashSeed(seedStr || String(Date.now()));
   const rng = makeRng(seed);
-  const city = buildCity(rng);
-  city.party.districtIdx = districtOf(city.party.cx, city.party.cy);
+  // the layout comes off its own fixed seed; `rng` only decides what the
+  // night puts in it
+  const city = buildCity(rng, citySeed);
+  city.party.districtIdx = city.party.block.district;
   const world = populate(rng, city);
   world.piles = [];
 
   // start far away from the party, on a sidewalk
   let start = null;
   for (let tries = 0; tries < 400; tries++) {
-    const cx = rng.int(0, GRID - 1), cy = rng.int(0, GRID - 1);
-    const p = ringPoint(cx, cy, rng.range(0, 1280), 0);
+    const b = rng.pick(city.blocks);
+    const p = ringPoint(b, rng.range(0, b.perim), 0);
     if (Math.hypot(p.x - city.party.ax, p.y - city.party.ay) > 2200) { start = p; break; }
   }
-  if (!start) start = ringPoint(0, 0, 200, 0);
+  if (!start) start = ringPoint(city.blocks[0], 200, 0);
 
   const player = makePlayer(start.x, start.y);
 
@@ -224,15 +226,12 @@ function findTarget(game) {
   const { player: p, world, city } = game;
   let best = null, bestD = Infinity;
 
-  const cx = Math.max(0, Math.min(GRID - 1, (p.x / CELL) | 0));
-  const cy = Math.max(0, Math.min(GRID - 1, (p.y / CELL) | 0));
-  for (let y = cy - 1; y <= cy + 1; y++) {
-    for (let x = cx - 1; x <= cx + 1; x++) {
-      if (x < 0 || y < 0 || x >= GRID || y >= GRID) continue;
-      for (const d of city.blockAt(x, y).doors) {
-        const dist = Math.hypot(p.x - d.ax, p.y - d.ay);
-        if (dist < DOOR_REACH && dist < bestD) { bestD = dist; best = { type: 'door', door: d }; }
-      }
+  // only doors on the blocks you could possibly be standing against
+  for (const b of city.blocksIn(p.x - DOOR_REACH, p.y - DOOR_REACH,
+                                p.x + DOOR_REACH, p.y + DOOR_REACH)) {
+    for (const d of b.doors) {
+      const dist = Math.hypot(p.x - d.ax, p.y - d.ay);
+      if (dist < DOOR_REACH && dist < bestD) { bestD = dist; best = { type: 'door', door: d }; }
     }
   }
   // you cannot ask a question of something you still think is a child
@@ -313,7 +312,7 @@ function talk(game, npc) {
 
   // a real witch will hand over the hardest thing she can
   const order = npc.kind === 'witch'
-    ? ['district', 'col', 'row', 'deco']
+    ? ['district', 'avenue', 'street', 'deco']
     : rng.shuffle(unknown.slice());
   const key = order.find(k => unknown.includes(k)) || unknown[0];
   // the value is the order it arrived in, so the deck can put the newest on
@@ -324,7 +323,7 @@ function talk(game, npc) {
   game.log.push({ text: factText(key, city.party) });
 
   let text = realLine(rng, npc.kind, key, city.party);
-  if (npc.kind === 'witch' && game.knowledge.district && game.knowledge.col && game.knowledge.row
+  if (npc.kind === 'witch' && game.knowledge.district && game.knowledge.avenue && game.knowledge.street
       && !game.knowledge.marked) {
     game.knowledge.marked = true;
     text += '  There. I have put it on your little map. Do not lose it twice.';
@@ -384,9 +383,8 @@ function releaseKid(k, distract) {
   k.following = false;
   k.state = 'patrol';
   k.distract = distract;
-  k.cx = Math.max(0, Math.min(GRID - 1, (k.x / CELL) | 0));
-  k.cy = Math.max(0, Math.min(GRID - 1, (k.y / CELL) | 0));
-  k.t = nearestRingT(k.cx, k.cy, k.x, k.y);
+  k.block = blockAt(k.x, k.y);
+  k.t = nearestRingT(k.block, k.x, k.y);
   k.lat = 0;
   k.speed = 26 + Math.random() * 20;
   k.dir = Math.random() < 0.5 ? 1 : -1;

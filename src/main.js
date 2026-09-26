@@ -1,5 +1,6 @@
 import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS } from './config.js';
 import { makeInput } from './input.js';
+import { hashSeed } from './rng.js';
 import { newGame, updateGame, knock, bringTipForward } from './game.js';
 import { FACT_KEYS } from './hints.js';
 import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
@@ -19,8 +20,13 @@ function fit() {
 window.addEventListener('resize', fit);
 fit();
 
-const seedParam = new URLSearchParams(location.search).get('seed');
-let game = newGame(seedParam || undefined);
+const params = new URLSearchParams(location.search);
+const seedParam = params.get('seed');
+// the layout seed is fixed in config.js; this is the override for cutting a
+// different city to look at
+const cityParam = params.get('citySeed');
+const citySeed = cityParam == null ? undefined : (hashSeed(cityParam) >>> 0);
+let game = newGame(seedParam || undefined, citySeed);
 let zoomIdx = DEFAULT_ZOOM;
 let paused = false;
 let last = performance.now();
@@ -61,7 +67,7 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 function restart() {
-  game = newGame(seedParam || undefined);
+  game = newGame(seedParam || undefined, citySeed);
   game.state = 'play';
   cam.x = game.player.x;
   cam.y = game.player.y;

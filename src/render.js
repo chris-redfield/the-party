@@ -1,5 +1,5 @@
 import {
-  CELL, GRID, WORLD, CORE1, VIEW_W, VIEW_H, PX,
+  TILE, TILE_N, WORLD, VIEW_W, VIEW_H, PX,
   BASS_RADIUS, LIGHTING, DAWN_TINT, BUMP_ANIM, VISION_BLEED, BAT_POOF,
 } from './config.js';
 import { makeRng } from './rng.js';
@@ -140,16 +140,19 @@ export function drawScene(ctx, cam, game) {
   const { city, world, player, clock } = game;
 
   const halfW = VIEW_W / (2 * z) + 64, halfH = VIEW_H / (2 * z) + 64;
-  const c0x = Math.max(0, Math.floor((cam.x - halfW) / CELL));
-  const c1x = Math.min(GRID - 1, Math.floor((cam.x + halfW) / CELL));
-  const c0y = Math.max(0, Math.floor((cam.y - halfH) / CELL));
-  const c1y = Math.min(GRID - 1, Math.floor((cam.y + halfH) / CELL));
-  const cells = [];
-  for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) cells.push({ cx, cy });
+  // the ground is cached in fixed square tiles; the blocks standing on it are
+  // any size at all and are asked for by rectangle
+  const t0x = Math.max(0, Math.floor((cam.x - halfW) / TILE));
+  const t1x = Math.min(TILE_N - 1, Math.floor((cam.x + halfW) / TILE));
+  const t0y = Math.max(0, Math.floor((cam.y - halfH) / TILE));
+  const t1y = Math.min(TILE_N - 1, Math.floor((cam.y + halfH) / TILE));
+  const tiles = [];
+  for (let ty = t0y; ty <= t1y; ty++) for (let tx = t0x; tx <= t1x; tx++) tiles.push({ tx, ty });
+  const near = city.blocksIn(cam.x - halfW, cam.y - halfH, cam.x + halfW, cam.y + halfH);
 
   applyVision(game.visionMix || 0);
   ctx.imageSmoothingEnabled = false;
-  drawGround(ctx, o, cells);
+  drawGround(ctx, o, tiles, city);
 
   // candy dropped on the pavement: twists of foil, which is to say the one
   // thing out here that is genuinely shiny
@@ -182,9 +185,8 @@ export function drawScene(ctx, cam, game) {
 
   // sorted draw list: buildings, lamps, people
   const list = [];
-  for (const { cx, cy } of cells) {
-    const block = city.blockAt(cx, cy);
-    list.push({ y: cy * CELL + CORE1, fn: () => drawBuilding(ctx, block, o, city, clock.t) });
+  for (const block of near) {
+    list.push({ y: block.cy1, fn: () => drawBuilding(ctx, block, o, city, clock.t) });
     for (const l of lampPositions(block)) list.push({ y: l.y, fn: () => drawLamp(ctx, l.x, l.y, o, clock.t) });
   }
   const inView = (e) => e.x > cam.x - halfW && e.x < cam.x + halfW
@@ -203,7 +205,7 @@ export function drawScene(ctx, cam, game) {
   list.sort((a, b) => a.y - b.y);
   for (const item of list) item.fn();
 
-  if (LIGHTING) drawLighting(ctx, o, cells, game);
+  if (LIGHTING) drawLighting(ctx, o, near, game);
   if (DAWN_TINT) drawDawn(ctx, game.clock);
 }
 
@@ -349,7 +351,7 @@ function drawPlayer(ctx, p, o, t) {
 // ---------------------------------------------------------------------------
 // Night, street light, sunrise
 // ---------------------------------------------------------------------------
-function drawLighting(ctx, o, cells, game) {
+function drawLighting(ctx, o, blocks, game) {
   const { ox, oy, z } = o;
   const { world, player, clock, city } = game;
 
@@ -374,8 +376,7 @@ function drawLighting(ctx, o, cells, game) {
     lightCtx.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
   };
 
-  for (const { cx, cy } of cells) {
-    const block = city.blockAt(cx, cy);
+  for (const block of blocks) {
     for (const l of lampPositions(block)) punch(l.x, l.y - 24, 176, 0.95);
     for (const d of block.doors) if (d.deco.key === 'pumpkin') punch(d.ax, d.ay, 52, 0.6);
   }
@@ -400,8 +401,7 @@ function drawLighting(ctx, o, cells, game) {
     glowCtx.fillStyle = g;
     glowCtx.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
   };
-  for (const { cx, cy } of cells) {
-    const block = city.blockAt(cx, cy);
+  for (const block of blocks) {
     for (const l of lampPositions(block)) add(l.x, l.y - 26, 120, '#ffb84d', 0.20);
     for (const d of block.doors) if (d.deco.key === 'pumpkin') add(d.ax, d.ay, 46, '#ff8a1e', 0.35);
   }
