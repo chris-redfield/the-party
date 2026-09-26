@@ -413,6 +413,19 @@ the screen at once. Windows are cached the same way, at the exact size they will
 stamped at so they are never scaled, and stamped forty times a frame.
 `PARTY.bench()` reports what a frame of city costs.
 
+**The camera hands out two offsets, and which one a thing uses matters.** The
+city uses the rounded one: ground tiles and buildings are rigid bodies made of
+many parts, and they all have to round against the same whole number or a
+window drifts inside its own facade and a tile opens a seam at its edge.
+Everything alive uses the true, unrounded one, and is rounded exactly once
+from its real position on screen. Round the camera first and the sprite
+second and you have two staircases stepping on different frames: as the camera
+chases the vampire the two nearly cancel, and what is left over is a pixel of
+him twitching back and forth along whatever direction he is walking. It stops
+dead when he walks into a wall, because then neither staircase is advancing.
+Measured over 400 frames at a walking pace: fourteen direction reversals
+before, none after.
+
 The people are not part of any of this. `drawSprite` turns image smoothing off
 for exactly as long as it takes to stamp one down, so the trick-or-treaters
 stay pixel art whatever the city does around them.
@@ -482,8 +495,8 @@ src/hourglass.js    the clock, which is a moon being ground into a sun
 src/audio.js        procedural sound, and the one recorded thing there is:
                     the soundtrack in assets/ost, streamed and looped
 src/sprites.js      PLACEHOLDER ART for everybody drawn out of code.
-src/artwork.js      the two who are not: the vampire and the witches, cut
-                    out of real drawings in assets/
+src/artwork.js      the ones who are not: the vampire, the witches and the
+                    nosferatu, cut out of real drawings in assets/
 src/input.js
 src/main.js         loop and wiring
 ```
@@ -494,9 +507,10 @@ replace `personSprite`, `catSprite` and `batSprite` with something that returns
 a canvas or image with `anchorX` / `anchorY` set to the sprite's feet, and
 nothing else has to change.
 
-**Two characters are the exception and are not drawn out of code**: the
-vampire you play and the witches you find. They are real drawings, and
-`src/artwork.js` cuts them out of their sheets and puts them on screen.
+**Three characters are the exception and are not drawn out of code**: the
+vampire you play, and the two monsters you find standing on the pavement — the
+witch and the nosferatu. They are real drawings, and `src/artwork.js` cuts
+them out of their sheets and puts them on screen.
 
 The vampire is `assets/vamp-frente e verso-01.png`, a sheet of eight: column 0
 is his back, column 1 his front, row 0 standing still and rows 1–3 the walk.
@@ -510,16 +524,20 @@ mirrored to make a pose, nothing is skipped and nothing is re-ordered; the
 mirror is only ever for facing left. If a frame ever looks wrong, the fix
 belongs in the sheet, not in the code that plays it.
 
-The witches are `assets/party-witch-01.png`, which is one drawing of one pose,
-facing you — and that is all a witch needs, because a monster stands on that
-pavement all night and never takes a step. `WITCH_BOX` is her height. The two sheets are drawn
-at different sizes, so the boxes are what put the characters in proportion to
-each other rather than in proportion to whatever the files were exported at:
-she comes out a little under the vampire, level with the monsters she replaces
-and a head over the children. She is
-only ever seen in vampire vision: out of it she is wearing a child's costume
-like every other monster, and that costume is still built out of code. She
-keeps her colour when the street drains, the way every monster does.
+The monsters are `assets/party-witch-01.png` and
+`assets/party-nosferatu-01.png`, one drawing of one pose each, facing you —
+and that is all a monster needs, because it stands on that pavement all night
+and never takes a step. `WITCH_BOX` and `NOSFERATU_BOX` are their heights. The
+sheets are all drawn at different sizes, so the boxes are what put the
+characters in proportion to each other rather than in proportion to whatever
+the files were exported at, and both are written off `VAMP_BOX` so that
+changing the player's height keeps the three of them in proportion: **the
+witch stands a fifth taller than the vampire you play** (120% of him, measured
+off the drawings) and **the nosferatu stands exactly his height**, wider in the
+shoulders and nothing else. Neither is ever seen outside vampire vision: out
+of it they are wearing a child's costume like every other monster, and that
+costume is still built out of code. They keep their colour when the street
+drains, the way every monster does.
 
 Two things about the sheet decide how that file works. Its background is white
 **and so is his face**, so keying white out would punch a hole through his

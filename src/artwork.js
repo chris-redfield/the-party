@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
 // THE DRAWINGS
 // ---------------------------------------------------------------------------
-// Most of this city is drawn out of code (src/sprites.js).  Two characters are
-// not - the vampire you play and the witches you find - and this is the file
-// that puts their artwork on the screen.
+// Most of this city is drawn out of code (src/sprites.js).  The characters who
+// are not - the vampire you play, and the witches and the nosferatu you find
+// standing on the pavement - are this file, which puts their artwork on the
+// screen.
 //
 // `assets/vamp-frente e verso-01.png` is a sheet of eight, two columns by four
 // rows.  Column 0 is his back, column 1 is his front; row 0 is standing still
@@ -28,21 +29,29 @@
 const VAMP_SHEET = 'assets/vamp-frente%20e%20verso-01.png';
 const VAMP_COLS = 2, VAMP_ROWS = 4;
 
-// One drawing, one pose, facing you.  That is all a witch needs: monsters
-// stand on that pavement all night and never take a step.
+// One drawing, one pose, facing you.  That is all a monster needs: they stand
+// on that pavement all night and never take a step.
 const WITCH_SHEET = 'assets/party-witch-01.png';
+const NOSFERATU_SHEET = 'assets/party-nosferatu-01.png';
 
 // How tall he stands, in the same art pixels everybody else is measured in.
 // The trick-or-treaters are 28 and he is a little over them - he is the one
 // adult out here, and the cape needs the room.
 export const VAMP_BOX = 33;
-// The witches are monsters, and a monster is an adult: she stands with the
-// rest of them, not with the player.  Her sheet is drawn at a different size
-// from his, so the box is what puts them in proportion to each other rather
-// than in proportion to whatever the files happened to be exported at - she
-// comes out a little under the vampire, level with the monsters she replaces
-// and a head over the children.
-export const WITCH_BOX = 27;
+// The monsters you meet are drawn at a different size on their own sheets, so
+// the box is what puts them in proportion to each other rather than in
+// proportion to whatever the files happened to be exported at.
+//
+// A monster is not an adult the way the player is an adult - it is the thing
+// the costume was pretending to be, and it wants to be the biggest figure on
+// the pavement.  So the witch is written as what she is: a fifth taller than
+// the vampire you play, off his box rather than off a number of her own, so
+// changing his height keeps the pair in proportion.
+export const WITCH_BOX = VAMP_BOX * 1.2;
+// The nosferatu is not scaled up the way she is: he stands exactly as tall as
+// the vampire you play, which is what makes him read as one of your own kind
+// rather than as one of hers.
+export const NOSFERATU_BOX = VAMP_BOX;
 
 // A pixel this close to white, reachable from outside the drawing, is
 // background.  The scan is generous because the sheet has soft edges.
@@ -61,6 +70,7 @@ export async function loadArtwork() {
   await Promise.all([
     sheet('vamp', VAMP_SHEET, VAMP_COLS, VAMP_ROWS),
     sheet('witch', WITCH_SHEET, 1, 1),
+    sheet('nosferatu', NOSFERATU_SHEET, 1, 1),
   ]);
 }
 
@@ -80,6 +90,7 @@ async function sheet(name, url, cols, rows) {
 
 export const vampArtReady = () => !!sheets.vamp;
 export const witchArtReady = () => !!sheets.witch;
+export const nosferatuArtReady = () => !!sheets.nosferatu;
 
 function cut(img, COLS, ROWS) {
   const cw = Math.floor(img.width / COLS), ch = Math.floor(img.height / ROWS);
@@ -204,12 +215,17 @@ export function vampFrame(back, frame, flip, scale) {
 }
 
 /** The witch, standing there. One pose, and she never needs another. */
-export function witchArt(scale) {
-  const sh = sheets.witch;
+export function witchArt(scale) { return still('witch', WITCH_BOX, scale); }
+
+/** The other monster on the pavement, drawn the same way and just as still. */
+export function nosferatuArt(scale) { return still('nosferatu', NOSFERATU_BOX, scale); }
+
+function still(name, box, scale) {
+  const sh = sheets[name];
   if (!sh) return null;
   const cell = sh.grid[0][0];
   if (!cell) return null;
-  return scaled('witch', cell, sh, WITCH_BOX, false, scale);
+  return scaled(name, cell, sh, box, false, scale);
 }
 
 /**

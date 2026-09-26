@@ -5,7 +5,7 @@ import {
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
-import { vampFrame, witchArt } from './artwork.js';
+import { vampFrame, witchArt, nosferatuArt } from './artwork.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
 import { drawGround, drawBuilding, drawLamp, lampPositions , drawStreetPumpkin } from './scenery.js';
 
@@ -143,8 +143,9 @@ function drawPerson(ctx, e, o, t) {
       drawSprite(ctx, greySprite(kid), gx, sy, MIX.vision);   // drains like any child
     }
     if (swap > 0) {
-      // a witch is a drawing; a vampire monster is still built out of code
-      const real = (e.kind === 'witch' && witchArt(scale))
+      // what is really there is a drawing, one per kind of monster; the coded
+      // sprite is only what stands in until the sheet lands
+      const real = (e.kind === 'witch' ? witchArt(scale) : nosferatuArt(scale))
         || personSprite(e.spec, dir, -1, scale);
       drawSprite(ctx, real, gx, sy, swap);
     }

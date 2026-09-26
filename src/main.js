@@ -27,9 +27,9 @@ fit();
 // anything can be drawn with it.  Nothing waits on this: it is wanted minutes
 // into a night at the earliest, and until it lands the screen sets in serif.
 loadDeathFonts();
-// The drawn characters - the vampire and the witches - cut out of their
-// sheets.  Nothing waits on this either: until they land, both are drawn with
-// the placeholder sprites.
+// The drawn characters - the vampire, and the monsters he finds - cut out of
+// their sheets.  Nothing waits on this either: until they land, every one of
+// them is drawn with the placeholder sprites.
 loadArtwork();
 
 const params = new URLSearchParams(location.search);
