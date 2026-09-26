@@ -139,6 +139,12 @@ window.PARTY = {
   skipTo(min) { game.clock.t = min / 360 * 720; },
   vision(sec) { game.vision = sec === undefined ? VISION_SECONDS : sec; },
   win() { knock(game, game.city.party); },
+  /** ms a frame of city costs - the scenery is the expensive half. */
+  bench(n = 40) {
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) drawScene(ctx, cam, game);
+    return `${((performance.now() - t0) / n).toFixed(2)} ms/frame @ z${cam.z}`;
+  },
 };
 
 requestAnimationFrame(frame);

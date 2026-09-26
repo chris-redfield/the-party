@@ -160,34 +160,81 @@ grey nor red.
 
 ### Look
 
-Ordinary sight is a colourful night city. Vampire vision is the same city
-drained to grey with every lit thing burning red. Both are one palette table in
-`src/render.js`; the live palette is lerped between the two columns every frame,
-which is why nothing downstream has to know which mode it is in. There are two
-readings of how far through the changeover we are: `visionMix`, the true
-continuous one, which everything alive is drawn from, and `sceneMix`, the same
-number snapped to `VISION_STEPS` stages, which the city is drawn from.
+The city is flat. There is no lighting in it at all - no pools under the
+lamps, no bloom off a lit window, no soft shadow under a parapet, not one
+gradient. Every surface is a solid colour, and where a surface has to read as
+having a second face - the side of a kerb, the dark a building puts on the
+pavement, the underside of a sill - that face is another solid colour sitting
+hard-edged next to it. All of it is in `src/scenery.js`, which draws the
+ground, the buildings, the doors, the decorations and the lamps, and knows
+nothing about the game.
 
-Doors stay red in both. `COLOR_DOORS` in `src/config.js` greys them out.
+**The one thing that is not flat is the material.** Every surface carries a
+texture: grit on the asphalt, dust on the concrete, gravel on a roof, a brick
+bond or rendered plaster on a facade, and a slow blotchy weathering over all
+of it. They are neutral light-and-dark overlays with no colour of their own,
+so they tint themselves against whatever is underneath, survive the drain to
+grey without a second copy, and are the only transparency in the file. They
+are locked to the world rather than the screen, so the road does not swim when
+the camera moves or shrink when you zoom.
 
-The torches, the junction crosses and the draining of the living are all keyed
-to the same `visionMix`, so they arrive and leave together. The living are
-drained by drawing a cached greyscale twin of the sprite over the top at
-`visionMix` — same silhouette, so it reads as desaturation and costs one extra
-canvas per sprite.
+**The ordinary city is a colourful night, not a grey one.** The whole left
+column of the palette, and the colours the city generator picks for its
+blocks, go through `saturate()` once at load; `SATURATION` in `src/palette.js`
+is the dial. The right column never does - what a vampire sees has no hue in
+it anywhere, by design.
 
-The scenery is painted flat — the palette carries the night on its own, with no
-street-lamp or darkness pass. `LIGHTING` turns the radial lighting pass back
-on. `DAWN_TINT` controls the sky going peach after 4:30 AM, kept separate
-because it is the timer rather than scenery mood.
+**Two cities, one table.** The palette is `src/palette.js`: a left column for
+what anybody sees and a right column for what a vampire sees, lerped every
+frame into the live palette `C`, so nothing downstream has to know which mode
+it is in. There are two readings of how far through the changeover we are:
+`MIX.vision`, the true continuous one, which everything alive is drawn from,
+and `MIX.scene`, the same number snapped to `VISION_STEPS` stages, which the
+city is drawn from. Doors stay red in both; `COLOR_DOORS` greys them out. The
+living are drained by drawing a cached greyscale twin of the sprite over the
+top - same silhouette, so it reads as desaturation.
+
+Nothing in the city fades between the two states, because nothing in the city
+uses opacity. A street lamp is a lamp below half way through the changeover
+and a torch above it, and it steps from one to the other. The upside-down
+cross arrives by having its colour come up out of the asphalt over the stages,
+not by fading in over it.
+
+**The cross.** Saint Peter's: a Latin cross stood on its head, so the long
+shaft runs up and the short stub hangs below the bar, with all four ends
+capped. The shaft lies exactly along the vertical lane markings and the bar
+exactly along the horizontal ones, and it is opaque, so the yellow crosshair
+it burns off simply stops being there. It is drawn over the finished street
+rather than into it, because the shaft is longer than the junction it stands
+in and runs up the road into the block above - baked into that block's tile it
+would be cut off at the tile's own edge, which is exactly what it did.
+
+**A block of ground never changes**, so each one is painted once into its own
+canvas and stamped after that: the whole road surface costs one `drawImage`
+per block instead of two hundred fills, which is what pays for the detail in
+it. The cache is thrown away when the zoom changes or the changeover moves to
+its next stage - the only two things that can alter it - and tiles that go off
+screen are dropped, because a tile is a megabyte and there are a hundred
+blocks. Windows are cached the same way, at the exact size they will be
+stamped at so they are never scaled, and stamped forty times a frame.
+`PARTY.bench()` reports what a frame of city costs.
+
+The people are not part of any of this. `drawSprite` turns image smoothing off
+for exactly as long as it takes to stamp one down, so the trick-or-treaters
+stay pixel art whatever the city does around them.
+
+`LIGHTING` still exists and still turns on a full-screen darkness-and-glow
+pass over the finished frame, which does light the people as well. It is off.
+`DAWN_TINT` controls the sky going peach after 4:30 AM, kept separate because
+it is the timer rather than scenery mood.
 
 `VISION_SECONDS` and `VISION_FADE` tune the cat's gift, `VISION_TAPER` is the
 fraction of it spent wearing off, `VISION_BLEED` the length of the pour and
 `CAT_TOUCH` how close you have to pass, `VISION_STEPS` how coarsely the city
-steps between the two palettes. The blood is a pure overlay in
-`drawBleed` — it accelerates the way a falling thing does, covers for a beat
-and fades out, so nothing has to be timed against it. `REVEAL` is how far the changeover
-has to have gone before a monster drops its costume — the picture and the `[E]`
+steps between the two palettes. The blood is a pure overlay in `drawBleed` -
+it accelerates the way a falling thing does, covers for a beat and fades out,
+so nothing has to be timed against it. `REVEAL` is how far the changeover has
+to have gone before a monster drops its costume - the picture and the `[E]`
 prompt read the same number, so you can never talk to something that still
 looks like a child. `MONSTERS_PER_BLOCK` is how many of them are out there;
 `BUMP_BLOOD`, `BUMP_STAGGER`, `BUMP_ANIM` and `BUMP_SHAKE` tune what it feels
@@ -206,7 +253,10 @@ src/entities.js     spawning and behaviour for kids / monsters / cats.
 src/player.js       movement, bat form, the candy speed penalty
 src/hints.js        FACT_KEYS - the facts, and the dialogue around them
 src/game.js         state machine: clock, interactions, win and loss
-src/render.js       camera, city, and the ordinary / vampire-vision palettes
+src/palette.js      the ordinary / vampire-vision colour table, and the mix
+src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
+                    street lamps. flat, textured, no living thing.
+src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
 src/audio.js        procedural sound - no audio files
@@ -215,7 +265,7 @@ src/input.js
 src/main.js         loop and wiring
 ```
 
-`src/sprites.js` is deliberately the only file that knows what anything looks
+`src/sprites.js` is deliberately the only file that knows what anybody looks
 like. It builds every character out of small colour grids at load time and
 caches the result. To swap in real art, replace `personSprite`, `catSprite` and
 `batSprite` with something that returns a canvas or image with `anchorX` /
@@ -238,5 +288,6 @@ PARTY.vision()     // 30 seconds of vampire vision (or vision(n) for n)
                    // vision(9) or less drops you straight into the wear-off
 PARTY.win()        // knock on the right door
 PARTY.restart()    // a fresh night
+PARTY.bench()      // ms a frame of city costs
 PARTY.game         // everything
 ```

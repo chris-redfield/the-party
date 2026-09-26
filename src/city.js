@@ -2,6 +2,7 @@ import {
   CELL, GRID, WORLD, ROAD, WALK, CORE0, CORE1, RING0, RING1,
   CROSS0, CROSS1, RA, RB, RLEN, RPERIM,
 } from './config.js';
+import { saturate } from './palette.js';
 
 // ---------------------------------------------------------------------------
 // Walkability
@@ -132,15 +133,21 @@ export function buildCity(rng) {
         ['#4a4f63', '#30344a'], ['#5a4d3c', '#3a3229'], ['#3e4a5e', '#282f3c'],
         ['#573f4a', '#372730'], ['#44523f', '#2b3429'], ['#5f5240', '#3e352a'],
       ]);
-      const base = palette[0];
-      const roof = rng.pick(['#2c3040', '#2f3628', '#382c34']);
-      const roofLight = rng.pick(['#363b4e', '#3a4331', '#453641']);
+      // the same boost the palette table gets: an ordinary night city has
+      // colour in it, and only the vampire's does not
+      const base = saturate(palette[0]);
+      // roof and seams come off the same roll, so they are picked together
+      const roofing = rng.pick([
+        ['#2c3040', '#363b4e'], ['#2f3628', '#3a4331'], ['#382c34', '#453641'],
+      ]);
+      const roof = saturate(roofing[0]);
+      const roofLight = saturate(roofing[1]);
       const block = {
         cx, cy, height, base,
         district: districtOf(cx, cy),
-        baseDark: palette[1], roof, roofLight,
+        baseDark: saturate(palette[1]), roof, roofLight,
         // the same four surfaces as a vampire sees them: same value, no hue
-        baseM: toMono(base), baseDarkM: toMono(palette[1]),
+        baseM: toMono(base), baseDarkM: toMono(saturate(palette[1])),
         roofM: toMono(roof), roofLightM: toMono(roofLight),
         lamps: rng.int(2, 4),
         seed: rng.int(0, 1e9),

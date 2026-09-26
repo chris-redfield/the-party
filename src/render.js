@@ -1,105 +1,14 @@
 import {
-  CELL, GRID, WORLD, ROAD, WALK, CORE0, CORE1, RING0, RING1, CROSS0, CROSS1,
-  VIEW_W, VIEW_H, PX, RA, RB, BASS_RADIUS, LIGHTING, DAWN_TINT, COLOR_DOORS,
-  BUMP_ANIM, VISION_BLEED, VISION_STEPS, BAT_POOF,
+  CELL, GRID, WORLD, CORE1, VIEW_W, VIEW_H, PX,
+  BASS_RADIUS, LIGHTING, DAWN_TINT, BUMP_ANIM, VISION_BLEED, BAT_POOF,
 } from './config.js';
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
+import { C, MIX, lerpHex, applyVision } from './palette.js';
+import { drawGround, drawBuilding, drawLamp, lampPositions } from './scenery.js';
 
-// --- palette ---------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Two cities.  The left column is what anybody sees; the right column is what
-// a vampire sees when a cat has lent it the eyes.  Every frame the live
-// palette `C` is lerped between them by `sceneMix`, so the changeover fades
-// for free and nothing downstream has to know which mode it is in.
-// ---------------------------------------------------------------------------
-const PALETTES = {
-  //                       ordinary        vampire vision
-  asphalt:        ['#232430', '#1b1b1b'],
-  asphaltDark:    ['#1a1b24', '#141414'],
-  coreShadow:     ['#0f1016', '#0b0b0b'],
-  laneLine:       ['#b09433', '#7a7a7a'],
-  walk:           ['#5b5d6e', '#4e4e4e'],
-  walkAlt:        ['#525466', '#474747'],
-  walkLine:       ['#42445a', '#3a3a3a'],
-  curb:           ['#767a8f', '#636363'],
-  cross:          ['#a9adc4', '#8c8c8c'],
-  manhole:        ['#2c2e3a', '#262626'],
-  wallTop:        ['#585470', '#4a4a4a'],
-  wallTopDark:    ['#39364c', '#313131'],
-  stoop:          ['#6a6780', '#5a5a5a'],
-  dark:           ['#14151c', '#131313'],
-  unlit:          ['#272b3a', '#242424'],
-  litter:         ['#5a4426', '#3a3a3a'],
-  litter2:        ['#463a52', '#333333'],
-  litter3:        ['#2f4a34', '#2e2e2e'],
-  litter4:        ['#5a3a3a', '#404040'],
-  roofVent:       ['#3a3d4e', '#313131'],
-  roofVentTop:    ['#4a4e63', '#3f3f3f'],
-  roofVentShadow: ['#22242e', '#262626'],
-  roofVentSlat:   ['#191b24', '#1e1e1e'],
-  skylightFrame:  ['#585470', '#4a4a4a'],
-  tankLeg:        ['#2a2118', '#242424'],
-  tankBody:       ['#5c452a', '#454545'],
-  tankTop:        ['#71573a', '#555555'],
-  tankBand:       ['#3c2d1c', '#303030'],
-  hatchBody:      ['#22242e', '#1e1e1e'],
-  hatchLid:       ['#454a5e', '#3c3c3c'],
-  lampPole:       ['#33354a', '#2f2f2f'],
-  doorFrame:      ['#191a22', '#1a1a1a'],
-  doorHandle:     ['#d8c268', '#a8a8a8'],
-  triedMark:      ['#f0dcdc', '#f0dcdc'],
-  // the things that are switched on
-  litWindow:      ['#ffbe4a', '#e8452f'],
-  litWindowPale:  ['#e8cf8a', '#b8362c'],
-  litSkylight:    ['#e0bd52', '#d04a34'],
-  lamp:           ['#ffd781', '#f2553c'],
-  // the lamp is a bulb in a box until a cat shows you it was always a fire
-  torchCup:       ['#33354a', '#2a2724'],
-  flameCore:      ['#ffe7bc', '#ffe2b0'],
-  flameMid:       ['#ffb347', '#f2553c'],
-  flameOuter:     ['#c98a2a', '#8e1f1f'],
-  // the yellow crosshair the road markings make at a four-way junction
-  hellCross:      ['#b09433', '#e8452f'],
-  hellCrossDark:  ['#6a5a1e', '#4a1109'],
-  // decorations
-  decoPumpkin:    ['#e08a26', '#b4b4b4'],
-  decoCobweb:     ['#b9b9cc', '#9a9a9a'],
-  decoSkeleton:   ['#dcdce8', '#c6c6c6'],
-  decoBats:       ['#1d1828', '#191919'],
-  decoGhost:      ['#cfcbe0', '#b6b6b6'],
-  decoFace:       ['#3a1a08', '#1a1a1a'],
-};
-
-/** Live palette, rebuilt once per frame by applyVision(). */
-const C = {};
-// Two readings of the same changeover.  `visionMix` is the true, continuous
-// one and belongs to anything alive - people fade properly, because a person
-// moving in steps reads as a dropped frame rather than as the world changing.
-// `sceneMix` is the same number snapped to a handful of stages, and the city
-// is drawn from that, so the street comes back in jerks.
-let visionMix = 0;
-let sceneMix = 0;
-
-function lerpHex(a, b, t) {
-  if (t <= 0) return a;
-  if (t >= 1) return b;
-  const ar = parseInt(a.slice(1, 3), 16), ag = parseInt(a.slice(3, 5), 16), ab = parseInt(a.slice(5, 7), 16);
-  const br = parseInt(b.slice(1, 3), 16), bg = parseInt(b.slice(3, 5), 16), bb = parseInt(b.slice(5, 7), 16);
-  const r = (ar + (br - ar) * t) | 0, g = (ag + (bg - ag) * t) | 0, bl = (ab + (bb - ab) * t) | 0;
-  return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
-}
-export { lerpHex };
-
-function applyVision(mix) {
-  visionMix = mix;
-  sceneMix = Math.round(mix * VISION_STEPS) / VISION_STEPS;
-  for (const k in PALETTES) C[k] = lerpHex(PALETTES[k][0], PALETTES[k][1], sceneMix);
-}
-applyVision(0);
-
-const WALL_H = 88;          // how much of the core is drawn as a front wall
+export { lampPositions };
 
 // The light and glow layers are nothing but soft gradients, so they are drawn
 // at half resolution and scaled back up: a quarter of the fill rate, and you
@@ -150,374 +59,6 @@ function camOrigin(cam) {
 }
 
 // ---------------------------------------------------------------------------
-// Ground
-// ---------------------------------------------------------------------------
-function drawGround(ctx, o, cells) {
-  const { ox, oy, z } = o;
-  // asphalt underneath everything
-  ctx.fillStyle = C.asphalt;
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-
-  for (const { cx, cy } of cells) {
-    const bx = cx * CELL, by = cy * CELL;
-    const X = (w) => ox + (bx + w) * z;
-    const Y = (w) => oy + (by + w) * z;
-
-    // lane markings on the two roads that border this cell
-    ctx.fillStyle = C.laneLine;
-    const dash = 44, gap = 44;
-    for (let t = 0; t < CELL; t += dash + gap) {
-      // vertical road (left edge of the cell)
-      ctx.fillRect(X(ROAD / 2 - 3), Y(t), 6 * z, dash * z);
-      // horizontal road (top edge)
-      ctx.fillRect(X(t), Y(ROAD / 2 - 3), dash * z, 6 * z);
-    }
-
-    // sidewalk ring
-    ctx.fillStyle = C.walk;
-    ctx.fillRect(X(RING0), Y(RING0), (RING1 - RING0) * z, (RING1 - RING0) * z);
-    ctx.fillStyle = C.asphaltDark;   // hole punched for the building footprint
-    ctx.fillRect(X(CORE0), Y(CORE0), (CORE1 - CORE0) * z, (CORE1 - CORE0) * z);
-
-    // paving joints
-    ctx.fillStyle = C.walkLine;
-    for (let t = RING0; t <= RING1; t += 32) {
-      ctx.fillRect(X(t), Y(RING0), Math.max(1, z), WALK * z);
-      ctx.fillRect(X(t), Y(CORE1), Math.max(1, z), WALK * z);
-      ctx.fillRect(X(RING0), Y(t), WALK * z, Math.max(1, z));
-      ctx.fillRect(X(CORE1), Y(t), WALK * z, Math.max(1, z));
-    }
-    // curb highlight along the road side
-    ctx.fillStyle = C.curb;
-    ctx.fillRect(X(RING0), Y(RING0), (RING1 - RING0) * z, 3 * z);
-    ctx.fillRect(X(RING0), Y(RING0), 3 * z, (RING1 - RING0) * z);
-    ctx.fillRect(X(RING1 - 3), Y(RING0), 3 * z, (RING1 - RING0) * z);
-    ctx.fillRect(X(RING0), Y(RING1 - 3), (RING1 - RING0) * z, 3 * z);
-
-    // zebra crossings
-    ctx.fillStyle = C.cross;
-    if (cx > 0) for (let s = 6; s < ROAD - 6; s += 22)
-      ctx.fillRect(X(s), Y(CROSS0 + 4), 12 * z, (CROSS1 - CROSS0 - 8) * z);
-    if (cy > 0) for (let s = 6; s < ROAD - 6; s += 22)
-      ctx.fillRect(X(CROSS0 + 4), Y(s), (CROSS1 - CROSS0 - 8) * z, 12 * z);
-
-    // Where two roads meet, the yellow markings cross in the middle of the
-    // junction and make a neat little crosshair.  Vampire vision burns that
-    // out of the asphalt and stands a cross up in its place, upside down.
-    // Road paint only - the zebra crossings are also the surface you are
-    // allowed to walk on, so those do not move a pixel.
-    if (sceneMix > 0.01) {
-      const jx = X(ROAD / 2), jy = Y(ROAD / 2);
-      ctx.save();
-      ctx.globalAlpha = sceneMix;
-      ctx.fillStyle = C.asphalt;                   // wipe the crosshair away
-      ctx.fillRect(X(0), Y(0), ROAD * z, ROAD * z);
-      // Long arm up, short arm down: Saint Peter's, the wrong way up.  The
-      // bar lies exactly along the horizontal lane markings and runs the full
-      // width of the junction, and the stem lies along the vertical ones, so
-      // the figure is continuous with the road paint it grew out of instead
-      // of sitting just off it.
-      ctx.fillStyle = C.hellCrossDark;
-      ctx.fillRect(jx - 7 * z, jy - 143 * z, 14 * z, 198 * z);
-      ctx.fillRect(X(4), jy - 7 * z, (ROAD - 8) * z, 14 * z);
-      ctx.fillStyle = C.hellCross;
-      ctx.fillRect(jx - 4 * z, jy - 140 * z, 8 * z, 192 * z);
-      ctx.fillRect(X(0), jy - 4 * z, ROAD * z, 8 * z);
-      ctx.restore();
-    }
-
-    // scatter: manholes, leaves, spilled candy wrappers
-    const rng = makeRng(cx * 7919 + cy * 104729 + 13);
-    for (let i = 0; i < 7; i++) {
-      const t = rng.range(RING0 + 8, RING1 - 8);
-      const side = rng.int(0, 3);
-      let px, py;
-      if (side === 0) { px = t; py = rng.range(RING0 + 6, CORE0 - 6); }
-      else if (side === 1) { px = t; py = rng.range(CORE1 + 6, RING1 - 6); }
-      else if (side === 2) { px = rng.range(RING0 + 6, CORE0 - 6); py = t; }
-      else { px = rng.range(CORE1 + 6, RING1 - 6); py = t; }
-      ctx.fillStyle = C[rng.pick(['litter', 'litter2', 'litter3', 'litter4'])];
-      const s = rng.range(3, 6);
-      ctx.fillRect(X(px), Y(py), s * z, s * z);
-    }
-    ctx.fillStyle = C.manhole;
-    ctx.beginPath();
-    ctx.arc(X(ROAD / 2), Y(CELL * 0.7), 16 * z, 0, 6.2832);
-    ctx.fill();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Buildings
-// ---------------------------------------------------------------------------
-const DECO_KEYS = {
-  pumpkin: 'decoPumpkin', cobweb: 'decoCobweb', skeleton: 'decoSkeleton',
-  bats: 'decoBats', ghost: 'decoGhost', none: null,
-};
-
-function drawDeco(ctx, kind, sx, sy, z) {
-  const key = DECO_KEYS[kind];
-  if (!key) return;
-  const col = C[key];
-  ctx.fillStyle = col;
-  switch (kind) {
-    case 'pumpkin':
-      ctx.beginPath(); ctx.arc(sx, sy, 8 * z, 0, 6.2832); ctx.fill();
-      ctx.fillStyle = C.decoFace;
-      ctx.fillRect(sx - 5 * z, sy - 2 * z, 3 * z, 3 * z);
-      ctx.fillRect(sx + 2 * z, sy - 2 * z, 3 * z, 3 * z);
-      ctx.fillRect(sx - 4 * z, sy + 3 * z, 8 * z, 2 * z);
-      break;
-    case 'cobweb':
-      ctx.globalAlpha = 0.65;
-      ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, z * 0.8);
-      for (let r = 3; r <= 9; r += 3) {
-        ctx.beginPath(); ctx.arc(sx, sy - 6 * z, r * z, 0.1, Math.PI - 0.1); ctx.stroke();
-      }
-      for (let a = 0; a < 5; a++) {
-        ctx.beginPath(); ctx.moveTo(sx, sy - 6 * z);
-        const ang = 0.2 + a * 0.68;
-        ctx.lineTo(sx + Math.cos(ang) * 10 * z, sy - 6 * z + Math.sin(ang) * 10 * z);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-      break;
-    case 'skeleton':
-      ctx.fillRect(sx - 3 * z, sy - 14 * z, 6 * z, 6 * z);
-      ctx.fillRect(sx - 2 * z, sy - 8 * z, 4 * z, 8 * z);
-      ctx.fillRect(sx - 6 * z, sy - 6 * z, 12 * z, 2 * z);
-      break;
-    case 'bats':
-      for (let i = -1; i <= 1; i++) {
-        ctx.fillRect(sx + i * 9 * z - 5 * z, sy - 12 * z + Math.abs(i) * 3 * z, 10 * z, 3 * z);
-        ctx.fillRect(sx + i * 9 * z - 2 * z, sy - 13 * z + Math.abs(i) * 3 * z, 4 * z, 3 * z);
-      }
-      break;
-    case 'ghost':
-      ctx.fillRect(sx - 1 * z, sy - 16 * z, 2 * z, 8 * z);
-      ctx.beginPath(); ctx.arc(sx, sy - 6 * z, 6 * z, Math.PI, 0); ctx.fill();
-      ctx.fillRect(sx - 6 * z, sy - 6 * z, 12 * z, 7 * z);
-      break;
-  }
-}
-
-function drawDoor(ctx, door, o, isParty, pulse) {
-  const { ox, oy, z } = o;
-  const col = COLOR_DOORS ? door.color : { hex: '#4a4a4a', trim: '#606060' };
-  const px = ox + door.x * z;        // doorstep, centred on the south facade
-  const py = oy + door.y * z;
-
-  // a step out onto the pavement: makes an entrance read as an entrance
-  const SD = 20 * z, SW = 52 * z;
-  ctx.fillStyle = C.stoop;
-  ctx.fillRect(px - SW / 2, py, SW, SD);
-  ctx.fillStyle = 'rgba(0,0,0,0.30)';
-  ctx.fillRect(px - SW / 2, py + SD - 4 * z, SW, 4 * z);
-
-  const dw = 36 * z, dh = 54 * z;
-  const dx = px - dw / 2, dy = py - dh;
-
-  ctx.fillStyle = C.doorFrame;                     // frame
-  ctx.fillRect(dx - 3 * z, dy - 3 * z, dw + 6 * z, dh + 6 * z);
-  ctx.fillStyle = col.hex;
-  ctx.fillRect(dx, dy, dw, dh);
-  ctx.fillStyle = col.trim;
-  ctx.fillRect(dx + 3 * z, dy + 3 * z, dw - 6 * z, dh * 0.18);
-  ctx.fillStyle = C.doorHandle;                    // handle
-  ctx.fillRect(dx + dw - 8 * z, dy + dh / 2 - 2 * z, 4 * z, 4 * z);
-
-  if (door.tried) {
-    ctx.strokeStyle = C.triedMark;   // has to read against the red
-    ctx.lineWidth = Math.max(2, 3 * z);
-    ctx.beginPath();
-    ctx.moveTo(dx + 4 * z, dy + 4 * z); ctx.lineTo(dx + dw - 4 * z, dy + dh - 4 * z);
-    ctx.moveTo(dx + dw - 4 * z, dy + 4 * z); ctx.lineTo(dx + 4 * z, dy + dh - 4 * z);
-    ctx.stroke();
-  }
-
-  drawDeco(ctx, door.deco.key, px + 32 * z, py - 26 * z, z);
-
-  if (isParty) {
-    // the only tell on the door itself, and only from close up: light spilling
-    // out under it and around the frame.  Painted, not a light source.
-    const a = 0.34 + 0.16 * pulse;
-    ctx.fillStyle = `rgba(190,140,255,${a})`;
-    ctx.fillRect(dx - 2 * z, dy - 2 * z, dw + 4 * z, 2 * z);
-    ctx.fillRect(dx - 2 * z, dy - 2 * z, 2 * z, dh + 4 * z);
-    ctx.fillRect(dx + dw, dy - 2 * z, 2 * z, dh + 4 * z);
-    ctx.fillStyle = `rgba(210,170,255,${a * 0.8})`;
-    ctx.fillRect(dx - 4 * z, py - 3 * z, dw + 8 * z, 3 * z);
-    ctx.fillStyle = `rgba(190,140,255,${a * 0.35})`;
-    ctx.fillRect(px - SW / 2, py, SW, SD * 0.7);
-  }
-}
-
-function drawBuilding(ctx, block, o, city, t) {
-  const { ox, oy, z } = o;
-  const bx = block.cx * CELL, by = block.cy * CELL;
-  const X = (w) => ox + (bx + w) * z;
-  const Y = (w) => oy + (by + w) * z;
-  const w = (CORE1 - CORE0) * z;
-  const rng = makeRng(block.seed);
-  const base = lerpHex(block.base, block.baseM, sceneMix);
-  const baseDark = lerpHex(block.baseDark, block.baseDarkM, sceneMix);
-  const roof = lerpHex(block.roof, block.roofM, sceneMix);
-  const roofLight = lerpHex(block.roofLight, block.roofLightM, sceneMix);
-
-  // a hard shadow on the pavement so the mass reads as solid
-  ctx.fillStyle = C.coreShadow;
-  ctx.fillRect(X(CORE0 - 7), Y(CORE0 - 7), w + 14 * z, (CORE1 - CORE0 + 14) * z);
-
-  // --- roof ---------------------------------------------------------------
-  const rh = (CORE1 - CORE0 - WALL_H) * z;
-  ctx.fillStyle = roof;
-  ctx.fillRect(X(CORE0), Y(CORE0), w, rh);
-
-  // gravel speckle
-  for (let i = 0; i < 44; i++) {
-    const gx = rng.range(CORE0 + 10, CORE1 - 12);
-    const gy = rng.range(CORE0 + 10, CORE1 - WALL_H - 10);
-    ctx.fillStyle = rng.chance(0.5) ? roofLight : C.asphaltDark;
-    ctx.fillRect(X(gx), Y(gy), 3 * z, 3 * z);
-  }
-  // tar-paper seams
-  ctx.fillStyle = roofLight;
-  for (let ry = CORE0 + 16; ry < CORE1 - WALL_H - 8; ry += 18)
-    ctx.fillRect(X(CORE0 + 6), Y(ry), w - 12 * z, Math.max(1, z));
-
-  // skylights
-  for (let i = 0; i < 2; i++) {
-    const sx2 = CORE0 + 26 + i * 110, sy2 = CORE0 + 30 + rng.range(0, 26);
-    ctx.fillStyle = C.skylightFrame;
-    ctx.fillRect(X(sx2 - 2), Y(sy2 - 2), 40 * z, 28 * z);
-    ctx.fillStyle = rng.chance(0.45) ? C.litSkylight : C.dark;
-    ctx.fillRect(X(sx2), Y(sy2), 36 * z, 24 * z);
-    ctx.fillStyle = C.skylightFrame;
-    ctx.fillRect(X(sx2 + 17), Y(sy2), 2 * z, 24 * z);
-  }
-  // air handling units
-  for (let i = 0; i < 2; i++) {
-    const ax2 = rng.range(CORE0 + 20, CORE1 - 60);
-    const ay2 = rng.range(CORE0 + 66, CORE1 - WALL_H - 34);
-    const aw = rng.range(26, 40), ah = rng.range(18, 26);
-    ctx.fillStyle = C.roofVentShadow; ctx.fillRect(X(ax2 + 2), Y(ay2 + 3), aw * z, ah * z);
-    ctx.fillStyle = C.roofVent; ctx.fillRect(X(ax2), Y(ay2), aw * z, ah * z);
-    ctx.fillStyle = C.roofVentTop; ctx.fillRect(X(ax2), Y(ay2), aw * z, 4 * z);
-    ctx.fillStyle = C.roofVentSlat;
-    for (let v = 0; v < 3; v++) ctx.fillRect(X(ax2 + 4), Y(ay2 + 8 + v * 5), (aw - 8) * z, 2 * z);
-  }
-  // water tank on stilts
-  {
-    const tx = rng.range(CORE0 + 30, CORE1 - 70), ty = CORE0 + 24;
-    ctx.fillStyle = C.tankLeg;
-    for (let l = 0; l < 4; l++) ctx.fillRect(X(tx + 4 + l * 11), Y(ty + 30), 3 * z, 14 * z);
-    ctx.fillStyle = C.tankBody; ctx.fillRect(X(tx), Y(ty), 44 * z, 32 * z);
-    ctx.fillStyle = C.tankTop; ctx.fillRect(X(tx), Y(ty), 44 * z, 5 * z);
-    ctx.fillStyle = C.tankBand;
-    for (let b = 0; b < 3; b++) ctx.fillRect(X(tx), Y(ty + 10 + b * 8), 44 * z, 2 * z);
-  }
-  // roof hatch
-  {
-    const hx = CORE1 - 54, hy = CORE1 - WALL_H - 34;
-    ctx.fillStyle = C.hatchBody; ctx.fillRect(X(hx), Y(hy), 24 * z, 18 * z);
-    ctx.fillStyle = C.hatchLid; ctx.fillRect(X(hx), Y(hy), 24 * z, 5 * z);
-  }
-
-  // lip around the whole roof: gives the block its height
-  ctx.fillStyle = C.wallTop;
-  ctx.fillRect(X(CORE0), Y(CORE0), w, 9 * z);
-  ctx.fillRect(X(CORE0), Y(CORE0), 9 * z, rh);
-  ctx.fillRect(X(CORE1 - 9), Y(CORE0), 9 * z, rh);
-  ctx.fillStyle = C.wallTopDark;
-  ctx.fillRect(X(CORE0), Y(CORE0 + 9), w, 3 * z);
-
-  // upper storeys visible on the north face, so the block has a front and back
-  for (let c = 0; c < 6; c++) {
-    const wx = CORE0 + 16 + c * 40;
-    if (wx + 22 > CORE1 - 10) break;
-    ctx.fillStyle = rng.chance(0.4) ? C.litSkylight : C.dark;
-    ctx.fillRect(X(wx), Y(CORE0 + 14), 22 * z, 14 * z);
-  }
-
-  // parapet above the front wall
-  ctx.fillStyle = C.wallTop;
-  ctx.fillRect(X(CORE0), Y(CORE1 - WALL_H - 8), w, 8 * z);
-  ctx.fillStyle = C.wallTopDark;
-  ctx.fillRect(X(CORE0), Y(CORE1 - WALL_H), w, 4 * z);
-
-  // front wall
-  ctx.fillStyle = base;
-  ctx.fillRect(X(CORE0), Y(CORE1 - WALL_H + 4), w, (WALL_H - 4) * z);
-  ctx.fillStyle = baseDark;
-  ctx.fillRect(X(CORE0), Y(CORE1 - 10), w, 10 * z);
-
-  // windows on the front wall
-  for (let r = 0; r < 2; r++) {
-    for (let c = 0; c < 5; c++) {
-      const wx = CORE0 + 14 + c * 46;
-      const wy = CORE1 - WALL_H + 14 + r * 32;
-      if (wx > CORE0 + 88 && wx < CORE0 + 152 && r === 1) continue;   // the door lives here
-      const lit = rng.chance(0.55);
-      ctx.fillStyle = C.dark;
-      ctx.fillRect(X(wx - 2), Y(wy - 2), 30 * z, 24 * z);
-      ctx.fillStyle = lit ? (rng.chance(0.3) ? C.litWindow : C.litWindowPale) : C.unlit;
-      ctx.fillRect(X(wx), Y(wy), 26 * z, 20 * z);
-      ctx.fillStyle = C.dark;
-      ctx.fillRect(X(wx + 12), Y(wy), 2 * z, 20 * z);
-      ctx.fillRect(X(wx), Y(wy + 9), 26 * z, 2 * z);
-    }
-  }
-
-  for (const d of block.doors) drawDoor(ctx, d, o, d.isParty, 0.5 + 0.5 * Math.sin(t * 4));
-}
-
-// ---------------------------------------------------------------------------
-// Street lamps - also the main light sources
-// ---------------------------------------------------------------------------
-export function lampPositions(block) {
-  const bx = block.cx * CELL, by = block.cy * CELL;
-  return [
-    { x: bx + RA, y: by + RA }, { x: bx + RB, y: by + RA },
-    { x: bx + RA, y: by + RB }, { x: bx + RB, y: by + RB },
-  ];
-}
-
-function drawLamp(ctx, lx, ly, o, t) {
-  const { ox, oy, z } = o;
-  const sx = ox + lx * z, sy = oy + ly * z;
-  ctx.fillStyle = C.lampPole;
-  ctx.fillRect(sx - 3 * z, sy - 58 * z, 6 * z, 58 * z);
-  ctx.fillRect(sx - 8 * z, sy - 3 * z, 16 * z, 4 * z);
-  if (sceneMix < 1) {             // the bulb: one of the two things still lit
-    ctx.save();
-    ctx.globalAlpha = 1 - sceneMix;
-    ctx.fillStyle = C.lamp;
-    ctx.fillRect(sx - 7 * z, sy - 66 * z, 14 * z, 9 * z);
-    ctx.restore();
-  }
-  // and underneath the bulb, all night, it was a torch
-  if (sceneMix > 0.01) drawFlame(ctx, sx, sy - 58 * z, z, t, lx * 0.017 + ly * 0.011);
-}
-
-const FLAME_ROWS = 9;
-
-/** A guttering fire, drawn in the same chunky rows as everything else. */
-function drawFlame(ctx, sx, sy, z, t, phase) {
-  ctx.save();
-  ctx.globalAlpha = sceneMix;
-  ctx.fillStyle = C.torchCup;
-  ctx.fillRect(sx - 8 * z, sy - 6 * z, 16 * z, 6 * z);
-  for (let i = 0; i < FLAME_ROWS; i++) {
-    const u = i / (FLAME_ROWS - 1);            // 0 at the cup, 1 at the tip
-    const w = (13 - u * 10) * (1 + 0.16 * Math.sin(t * 9 + phase + u * 5));
-    const dx = Math.sin(t * 6.5 + phase + u * 4) * u * 4;
-    ctx.fillStyle = u < 0.3 ? C.flameCore : (u < 0.68 ? C.flameMid : C.flameOuter);
-    ctx.fillRect(sx + dx * z - (w / 2) * z, sy - 6 * z - (i + 1) * 3 * z, w * z, 3 * z);
-  }
-  ctx.restore();
-}
-
-// ---------------------------------------------------------------------------
 // Entity drawing
 // ---------------------------------------------------------------------------
 function shadow(ctx, sx, sy, z, w, a = 0.35) {
@@ -546,9 +87,12 @@ function bubble(ctx, text, sx, sy, z) {
 
 function drawSprite(ctx, cv, sx, sy, alpha) {
   if (alpha <= 0) return;
-  if (alpha < 1) { ctx.save(); ctx.globalAlpha = alpha; }
+  ctx.save();
+  // the people are still pixel art and are not to be interpolated into soup
+  ctx.imageSmoothingEnabled = false;
+  if (alpha < 1) ctx.globalAlpha = alpha;
   ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - cv.anchorY));
-  if (alpha < 1) ctx.restore();
+  ctx.restore();
 }
 
 // A monster holds its costume until the changeover is most of the way in and
@@ -564,7 +108,7 @@ function drawPerson(ctx, e, o, t) {
   const scale = PX * z;
 
   if (e.disguise) {
-    const swap = swapAt(visionMix);
+    const swap = swapAt(MIX.vision);
     // it only leaves the ground once it has stopped pretending
     const lift = (4 + Math.sin(t * 2 + (e.bob || 0)) * 3) * swap;
     const sy = gy - lift * z;
@@ -573,7 +117,7 @@ function drawPerson(ctx, e, o, t) {
     if (swap < 1) {
       const kid = personSprite(e.disguise, dir, frame, scale);
       drawSprite(ctx, kid, gx, sy, 1);
-      drawSprite(ctx, greySprite(kid), gx, sy, visionMix);   // drains like any child
+      drawSprite(ctx, greySprite(kid), gx, sy, MIX.vision);   // drains like any child
     }
     if (swap > 0) drawSprite(ctx, personSprite(e.spec, dir, -1, scale), gx, sy, swap);
   } else {
@@ -581,7 +125,7 @@ function drawPerson(ctx, e, o, t) {
     const cv = personSprite(e.spec, dir, frame, scale);
     drawSprite(ctx, cv, gx, gy, 1);
     // the living go black and white. only the monsters keep their colour.
-    if (visionMix > 0) drawSprite(ctx, greySprite(cv), gx, gy, visionMix);
+    if (MIX.vision > 0) drawSprite(ctx, greySprite(cv), gx, gy, MIX.vision);
   }
   if (e.sayT > 0 && e.say) bubble(ctx, e.say, gx, gy - 52 * z, z);
 }
@@ -607,14 +151,32 @@ export function drawScene(ctx, cam, game) {
   ctx.imageSmoothingEnabled = false;
   drawGround(ctx, o, cells);
 
-  // candy dropped on the pavement
+  // candy dropped on the pavement: twists of foil, which is to say the one
+  // thing out here that is genuinely shiny
   for (const pile of world.piles) {
     const sx = o.ox + pile.x * z, sy = o.oy + pile.y * z;
     shadow(ctx, sx, sy, z, 10, 0.3);
     for (let i = 0; i < Math.min(12, pile.amount); i++) {
       const a = (i / 12) * 6.2832 + pile.seed;
-      ctx.fillStyle = ['#e04a6a', '#e0b23a', '#4ab0e0', '#6ad04a'][i % 4];
-      ctx.fillRect(sx + Math.cos(a) * 9 * z - 2 * z, sy + Math.sin(a) * 5 * z - 2 * z, 5 * z, 5 * z);
+      const px = sx + Math.cos(a) * 9 * z, py = sy + Math.sin(a) * 5 * z;
+      const hue = ['#e04a6a', '#e0b23a', '#4ab0e0', '#6ad04a'][i % 4];
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(a * 1.7);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.ellipse(0.8 * z, 1.2 * z, 3.4 * z, 2.2 * z, 0, 0, 6.2832); ctx.fill();
+      const g = ctx.createLinearGradient(0, -2.4 * z, 0, 2.4 * z);
+      g.addColorStop(0, lerpHex(hue, '#ffffff', 0.45));
+      g.addColorStop(0.5, hue);
+      g.addColorStop(1, lerpHex(hue, '#000000', 0.45));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(0, 0, 3.2 * z, 2 * z, 0, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = lerpHex(hue, '#000000', 0.3);      // the twisted ends
+      ctx.beginPath(); ctx.moveTo(-3 * z, 0); ctx.lineTo(-5 * z, -1.6 * z);
+      ctx.lineTo(-5 * z, 1.6 * z); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(3 * z, 0); ctx.lineTo(5 * z, -1.6 * z);
+      ctx.lineTo(5 * z, 1.6 * z); ctx.closePath(); ctx.fill();
+      ctx.restore();
     }
   }
 
@@ -647,7 +209,7 @@ export function drawScene(ctx, cam, game) {
 
 function drawNpc(ctx, n, o, t) {
   drawPerson(ctx, { ...n, dir: 'down', frame: -1 }, o, t);
-  const ring = swapAt(visionMix);
+  const ring = swapAt(MIX.vision);
   if (ring <= 0) return;
   // no shadow, but a faint ring of nothing-in-particular on the ground it is
   // not standing on.  Readable once you know to look for it.
@@ -666,7 +228,7 @@ function drawNpc(ctx, n, o, t) {
 // include them at all - they go out of the street as the colour does, and
 // come back as it comes back, which is presumably how they prefer it.
 function drawCat(ctx, c, o, t) {
-  const a = 1 - visionMix;
+  const a = 1 - MIX.vision;
   if (a <= 0.02) return;
   const { ox, oy, z } = o;
   const sx = ox + c.x * z, sy = oy + c.y * z;
