@@ -1,5 +1,4 @@
 import { DISTRICTS } from './city.js';
-import { GRID } from './config.js';
 
 // The facts that, taken together, pin down exactly one door in the city.
 // Every block has one door, so district + avenue + street is already an
@@ -52,43 +51,6 @@ const CAT_LINES = [
   'The cat has been to the party. The cat left early.',
   'The cat does not blink. You blink. You lose.',
 ];
-const FAKE_LINES = [
-  'DUUUDE. Sick fangs. Where did you get those, the mall?',
-  'Bro, is that eyeliner? That is definitely eyeliner.',
-  'My roommate is a vampire too. He works in crypto.',
-  'Can you do the accent? Do the accent!',
-  'I have been drinking the red punch all night. I feel AMAZING.',
-  'Hey, sunglasses at night! Like the song! Do you know the song?',
-  'My contacts are killing me. How do you keep yours in?',
-  'Do you want a Twix? I have like nine hundred Twix.',
-  'Is this a costume contest thing? Are you winning?',
-  'You should smile more, man. It is Halloween.',
-];
-const FAKE_WITCH_LINES = [
-  'I made this hat myself. With a glue gun. And rage.',
-  'I do tarot on the internet. Want a reading? It is forty dollars.',
-  'The moon is in something. Cancer? Is cancer a moon thing?',
-  'My broom is from a craft store and honestly it sweeps great.',
-];
-const RUMOR_PREFIX = [
-  'Okay so I heard',
-  'My cousin SWEARS',
-  'Some guy in a Scream mask told me',
-  'The lady with the fog machine said',
-];
-
-export function makeRumor(rng, city) {
-  // a plausible but wrong fact - the player has no way to tell from the words
-  // alone, only from noticing the speaker has a shadow.
-  const key = rng.pick(FACT_KEYS);
-  const fakeParty = {
-    districtIdx: rng.int(0, DISTRICTS.length - 1),
-    cx: rng.int(0, GRID - 1), cy: rng.int(0, GRID - 1),
-    deco: rng.pick(city.doors).deco,
-  };
-  return `${rng.pick(RUMOR_PREFIX)} ${factText(key, fakeParty)}.`;
-}
-
 export function realLine(rng, kind, key, party) {
   const opener = kind === 'witch' ? rng.pick(REAL_WITCH_OPENERS) : rng.pick(REAL_VAMP_OPENERS);
   return `${opener} Listen: ${factText(key, party)}.`;
@@ -101,10 +63,6 @@ export function exhaustedLine(rng, kind, party, dist) {
   return kind === 'witch'
     ? `I have told you everything I know. ${near}`
     : `I already told you. ${near}`;
-}
-
-export function fakeLine(rng, kind) {
-  return kind === 'witch' ? rng.pick(FAKE_WITCH_LINES) : rng.pick(FAKE_LINES);
 }
 
 export function catLine(rng) { return rng.pick(CAT_LINES); }

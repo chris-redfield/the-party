@@ -2,7 +2,7 @@ import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS } from './config.js
 import { makeInput } from './input.js';
 import { newGame, updateGame, knock } from './game.js';
 import { FACT_KEYS } from './hints.js';
-import { makeCamera, updateCamera, drawScene } from './render.js';
+import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
 import { drawHud, drawTitle, drawEnd } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity } from './audio.js';
 
@@ -87,6 +87,7 @@ function frame(now) {
     }
     drawScene(ctx, cam, game);
     drawHud(ctx, game);
+    drawBleed(ctx, game);          // over the HUD too: it happens to you
     if (paused) drawPause(ctx);
   }
 

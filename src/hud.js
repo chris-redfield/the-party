@@ -43,7 +43,7 @@ function bar(ctx, x, y, w, h, frac, fill, back, label) {
 
 // ---------------------------------------------------------------------------
 export function drawHud(ctx, game) {
-  const { player, clock, knowledge, city, log, prompt, dialogue, world } = game;
+  const { player, clock, knowledge, city, prompt, dialogue, world } = game;
   ctx.textBaseline = 'alphabetic';
 
   // --- vitals -------------------------------------------------------------
@@ -78,7 +78,7 @@ export function drawHud(ctx, game) {
 
   drawVision(ctx, game);
   drawMinimap(ctx, game);
-  if (!dialogue) drawClues(ctx, knowledge, city, log);
+  if (!dialogue) drawClues(ctx, knowledge, city);
 
   // --- interaction prompt --------------------------------------------------
   if (prompt && !dialogue) {
@@ -152,11 +152,9 @@ function wrap(ctx, text, x, y, maxW, lh) {
 }
 
 // ---------------------------------------------------------------------------
-function drawClues(ctx, knowledge, city, log) {
+function drawClues(ctx, knowledge, city) {
   const known = FACT_KEYS.filter(k => knowledge[k]);
-  const rumors = log.filter(l => l.rumor).slice(-2);
-  const rows = Math.max(known.length, 1) + (rumors.length ? rumors.length + 1 : 0);
-  const h = 46 + rows * 20;
+  const h = 46 + Math.max(known.length, 1) * 20;
   panel(ctx, 16, VIEW_H - h - 16, 372, h);
   ctx.textAlign = 'left';
   ctx.font = FONT(13);
@@ -166,7 +164,7 @@ function drawClues(ctx, knowledge, city, log) {
   let y = VIEW_H - h + 30;
   if (!known.length) {
     ctx.fillStyle = '#7a7288';
-    ctx.fillText('nothing. ask somebody real.', 28, y);
+    ctx.fillText('nothing. find a cat, find a monster.', 28, y);
     y += 20;
   }
   for (const k of known) {
@@ -174,24 +172,6 @@ function drawClues(ctx, knowledge, city, log) {
     ctx.fillText('* ' + shortFact(k, city.party), 28, y);
     y += 20;
   }
-  if (rumors.length) {
-    ctx.font = FONT(12);
-    ctx.fillStyle = '#a06a6a';
-    ctx.fillText('HEARSAY  (from people in costumes)', 28, y + 2);
-    y += 20;
-    ctx.font = FONT(13, false);
-    for (const r of rumors) {
-      ctx.fillStyle = '#8a6a72';
-      ctx.fillText('? ' + clipTo(ctx, r.text, 330), 28, y);
-      y += 20;
-    }
-  }
-}
-
-function clipTo(ctx, text, maxW) {
-  let t = text;
-  while (t.length > 4 && ctx.measureText(t).width > maxW) t = t.slice(0, -2);
-  return t === text ? t : t + '...';
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +233,6 @@ function drawMinimap(ctx, game) {
   if (game.visionMix > 0.1) {
     ctx.globalAlpha = game.visionMix;
     for (const n of game.world.npcs) {
-      if (!n.real) continue;
       if (Math.hypot(n.x - player.x, n.y - player.y) > 1500) continue;
       ctx.fillStyle = n.kind === 'witch' ? '#7aff9a' : '#ff5a4a';
       ctx.fillRect(x + pad + (n.x / CELL) * S - 1, y + pad + (n.y / CELL) * S - 1, 3, 3);
@@ -294,13 +273,13 @@ export function drawTitle(ctx, t) {
     ['KNOCK / TALK', 'E  -  wrong door means candy, and candy means children'],
     ['DUMP CANDY', 'Q  -  drop the bag, lose the tail'],
     ['', ''],
-    ['BLACK CATS', 'E  -  a cat lends you VAMPIRE VISION for one minute.'],
-    ['', 'the colour goes out of the city, every light burns red,'],
-    ['', 'and the real monsters appear on the pavement.'],
+    ['BLACK CATS', `WALK INTO ONE  -  ${VISION_SECONDS} SECONDS of VAMPIRE VISION.`],
+    ['', 'the living go grey, the lamps turn out to be torches, and'],
+    ['', 'the monsters stop looking like somebody\'s kid. the cats go.'],
     ['', ''],
-    ['THE POINT', 'only real monsters know where the party is. without the'],
-    ['', 'vision you cannot see them, let alone ask them. everyone'],
-    ['', 'else out here is a person in a costume with a rumour.'],
+    ['THE POINT', 'only monsters know where the party is, and out here they'],
+    ['', 'are dressed as trick-or-treaters like everybody else.'],
+    ['', 'the street is all children until a cat says otherwise.'],
   ];
   ctx.font = FONT(16);
   let y = 286;

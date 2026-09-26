@@ -1,4 +1,4 @@
-import { CELL, GRID, RPERIM, KIDS_PER_BLOCK, NPCS_PER_BLOCK, CAT_CHANCE } from './config.js';
+import { CELL, GRID, RPERIM, KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE } from './config.js';
 import { ringPoint, doorGeometry } from './city.js';
 
 // ---------------------------------------------------------------------------
@@ -56,14 +56,6 @@ export function realVampSpec(rng) {
     glow: '#ff3d55',
   };
 }
-export function fakeVampSpec(rng) {
-  const s = baseSpec(rng);
-  s.cape = rng.pick(['#4a2352', '#5a2a2a', '#2a2a5a']);
-  s.capeLining = '#c23a52'; s.fangs = true;
-  s.shirtFront = '#f2ece0'; s.tie = '#d94a5f';
-  s.shoes = '#e8e8ee';            // sneakers. dead giveaway.
-  return s;
-}
 /** A real witch: green cast, glowing eyes, hovers, no shadow. */
 export function realWitchSpec(rng) {
   return {
@@ -74,13 +66,6 @@ export function realWitchSpec(rng) {
     hat: '#1c1726', hatBand: '#6ce05a', float: true,
     glow: '#63e84f',
   };
-}
-export function fakeWitchSpec(rng) {
-  const s = baseSpec(rng);
-  s.hat = rng.pick(['#2a2436', '#3a2440']);
-  s.hatBand = '#d8b23a';
-  s.shoes = '#e8e8ee';
-  return s;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,20 +110,22 @@ export function populate(rng, city) {
       }
     }
 
-    const nNpc = rng.int(NPCS_PER_BLOCK[0], NPCS_PER_BLOCK[1]);
+    // The monsters.  To ordinary eyes every one of them is another kid in a
+    // costume standing on the pavement - same sprite, same shove, same
+    // nothing to say.  `disguise` is what you see; `spec` is what is
+    // actually there, and only a cat will show you the difference.
+    const nNpc = rng.int(MONSTERS_PER_BLOCK[0], MONSTERS_PER_BLOCK[1]);
     for (let i = 0; i < nNpc; i++) {
       const isWitch = rng.chance(0.42);
-      const real = rng.chance(0.34);
-      const spec = isWitch
-        ? (real ? realWitchSpec(rng) : fakeWitchSpec(rng))
-        : (real ? realVampSpec(rng) : fakeVampSpec(rng));
+      const spec = isWitch ? realWitchSpec(rng) : realVampSpec(rng);
       const t = rng.range(0, RPERIM);
       const p = ringPoint(cx, cy, t, rng.range(-20, 20));
       npcs.push({
         kind: isWitch ? 'witch' : 'vampire',
-        real, spec, cx, cy,
+        real: true, spec, disguise: kidSpec(rng), cx, cy,
         x: p.x, y: p.y,
         bob: rng.range(0, 6.28),
+        bump: 0, say: null, sayT: 0,
         talked: 0, seed: rng.int(0, 1e9),
       });
     }

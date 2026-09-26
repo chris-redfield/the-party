@@ -1,14 +1,15 @@
 import {
   CELL, GRID, MIN_PER_SEC, NIGHT_MINUTES, BLOOD_DRAIN, BLOOD_MAX, MANA_MAX,
   CANDY_PER_WRONG_DOOR, PUNCH_BLOOD, BUMP_BLOOD, BUMP_STAGGER, BUMP_SHAKE,
-  SIM_RADIUS, BASS_RADIUS, VISION_SECONDS, VISION_FADE,
+  SIM_RADIUS, BASS_RADIUS, VISION_SECONDS, VISION_FADE, VISION_TAPER,
+  VISION_BLEED, REVEAL, CAT_TOUCH,
 } from './config.js';
 import { makeRng, hashSeed } from './rng.js';
 import { buildCity, districtOf, ringPoint, isWalkable } from './city.js';
 import { populate, updateKid, updateCat, nearestRingT } from './entities.js';
 import { makePlayer, updatePlayer, tryBat, wantedFollowers, shove } from './player.js';
 import {
-  FACT_KEYS, realLine, fakeLine, exhaustedLine, catLine, makeRumor, factText,
+  FACT_KEYS, realLine, exhaustedLine, catLine, factText,
 } from './hints.js';
 import { sfx, setBassProximity } from './audio.js';
 
@@ -43,7 +44,7 @@ export function newGame(seedStr) {
     knowledge: {},
     toasts: [], log: [],
     prompt: null, dialogue: null, target: null,
-    vision: 0, visionMix: 0, camShake: 0,
+    vision: 0, visionMix: 0, bleed: 0, camShake: 0,
     endTitle: '', endText: '',
     stats: { knocks: 0, talks: 0, bats: 0 },
   };
@@ -71,14 +72,21 @@ export function updateGame(game, dt, input) {
 
   p.blood -= BLOOD_DRAIN * dt;
 
-  // vampire vision burns down on its own clock and bleeds in and out at
-  // both ends, which is what the whole palette is lerped against.
+  // Vampire vision burns down on its own clock.  It arrives fast - a cat does
+  // not ease you into it - and then spends its last 30% draining away, which
+  // is the whole palette, the torches and the monsters going with it.  At zero
+  // the mix is exactly zero and you are back in the ordinary city.
+  if (game.bleed > 0) game.bleed = Math.max(0, game.bleed - dt);
   if (game.vision > 0) {
     game.vision = Math.max(0, game.vision - dt);
     const t = game.vision;
+    const taper = VISION_SECONDS * VISION_TAPER;
     game.visionMix = Math.max(0, Math.min(1,
-      Math.min((VISION_SECONDS - t) / VISION_FADE, t / VISION_FADE)));
-    if (game.vision === 0) toast(game, 'the city goes back to normal. so do you.', '#8a7ea8');
+      Math.min((VISION_SECONDS - t) / VISION_FADE, t / taper)));
+    if (game.vision === 0) {
+      game.visionMix = 0;
+      toast(game, 'the city goes back to normal. so do you.', '#8a7ea8');
+    }
   } else if (game.visionMix > 0) {
     game.visionMix = Math.max(0, game.visionMix - dt / VISION_FADE);
   }
@@ -133,24 +141,36 @@ export function updateGame(game, dt, input) {
     }
     if (k.sayT > 0) k.sayT -= dt;
   }
-  // Grown-ups are furniture with opinions. You cannot walk through them either,
-  // and the ones you cannot see are not there to walk into.
+  // A monster in its costume is just another solid child on the pavement, and
+  // it charges you for the collision like one - it has a part to play. Once a
+  // cat has shown you what it is, it stops pretending and just stands there.
+  const hidden = game.visionMix < REVEAL;
   for (const n of world.npcs) {
-    if (n.real && game.vision <= 0) { n.bump = 0; continue; }
+    if (n.sayT > 0) n.sayT -= dt;
+    if (n.bump > 0) n.bump -= dt;
     if (p.bat > 0) continue;
     if (Math.abs(n.x - p.x) + Math.abs(n.y - p.y) > 120) continue;
     const dx = p.x - n.x, dy = p.y - n.y;
     const d = Math.hypot(dx, dy);
-    if (n.bump > 0) n.bump -= dt;
     if (d < NPC_BLOCK) {
       const a = d > 0.01 ? Math.atan2(dy, dx) : Math.random() * 6.2832;
       const px = n.x + Math.cos(a) * NPC_BLOCK, py = n.y + Math.sin(a) * NPC_BLOCK;
       if (isWalkable(px, py)) { p.x = px; p.y = py; }
       if (n.bump <= 0) {
-        n.bump = 1.6;
+        n.bump = hidden ? 2.0 : 1.6;
         shove(p, n.x, n.y);
-        game.camShake = BUMP_SHAKE * 0.6;
         sfx.bump();
+        if (hidden) {
+          p.blood -= BUMP_BLOOD;
+          p.stagger = BUMP_STAGGER;
+          p.hurtFlash = 0.3;
+          game.camShake = BUMP_SHAKE;
+          n.say = 'TRICK OR TREAT!';
+          n.sayT = 1.4;
+          toast(game, '"TRICK OR TREAT!"   you lose a second you do not have', '#d8d0e8');
+        } else {
+          game.camShake = BUMP_SHAKE * 0.6;
+        }
       }
     }
   }
@@ -158,6 +178,11 @@ export function updateGame(game, dt, input) {
   for (const c of world.cats) {
     if (Math.abs(c.x - p.x) + Math.abs(c.y - p.y) > SIM_RADIUS) continue;
     updateCat(c, dt);
+    // No asking: you brush against it and it decides.  A cat you cannot see
+    // is not there to brush against, so one already in hand cannot be spent
+    // by blundering into a cat the vision has taken off the street.
+    if (!c.used && game.visionMix < REVEAL
+        && Math.hypot(c.x - p.x, c.y - p.y) < CAT_TOUCH) lendVision(game, c);
   }
 
   manageFollowers(game);
@@ -199,14 +224,10 @@ function findTarget(game) {
       }
     }
   }
-  for (const n of world.npcs) {
-    if (n.real && game.vision <= 0) continue;      // you cannot talk to what you cannot see
+  // you cannot ask a question of something you still think is a child
+  if (game.visionMix >= REVEAL) for (const n of world.npcs) {
     const dist = distTo(n, p.x, p.y);
     if (dist < TALK_REACH && dist < bestD) { bestD = dist; best = { type: 'npc', npc: n }; }
-  }
-  for (const c of world.cats) {
-    const dist = distTo(c, p.x, p.y);
-    if (dist < 40 && dist < bestD) { bestD = dist; best = { type: 'cat', cat: c }; }
   }
 
   game.target = best;
@@ -216,10 +237,8 @@ function findTarget(game) {
     game.prompt = d.tried
       ? '[E]  knock again on this door (you already tried it)'
       : '[E]  knock on the red door';
-  } else if (best.type === 'npc') {
-    game.prompt = `[E]  talk to the ${best.npc.kind === 'witch' ? 'witch' : 'vampire'}`;
   } else {
-    game.prompt = '[E]  acknowledge the cat';
+    game.prompt = `[E]  talk to the ${best.npc.kind === 'witch' ? 'witch' : 'vampire'}`;
   }
 }
 
@@ -227,7 +246,6 @@ function findTarget(game) {
 function interact(game, target) {
   if (target.type === 'door') return knock(game, target.door);
   if (target.type === 'npc') return talk(game, target.npc);
-  if (target.type === 'cat') return pet(game, target.cat);
 }
 
 export function knock(game, door) {
@@ -270,21 +288,7 @@ function talk(game, npc) {
   const { city, rng } = game;
   sfx.talk();
   game.stats.talks++;
-  const kindName = npc.kind === 'witch' ? 'WITCH' : 'VAMPIRE';
-  const label = npc.real ? kindName : `${kindName}? (a person in a costume)`;
-
-  if (!npc.real) {
-    let text = fakeLine(rng, npc.kind);
-    if (rng.chance(0.3)) {
-      const rumor = makeRumor(rng, city);
-      text += '  ' + rumor;
-      game.log.push({ text: rumor, rumor: true });
-      if (game.log.length > 12) game.log.shift();
-    }
-    game.dialogue = { name: label, nameColor: '#8a8aa8', text };
-    npc.talked++;
-    return;
-  }
+  const label = npc.kind === 'witch' ? 'WITCH' : 'VAMPIRE';
 
   const unknown = FACT_KEYS.filter(k => !game.knowledge[k]);
   if (npc.talked > 0 || unknown.length === 0) {
@@ -304,7 +308,7 @@ function talk(game, npc) {
   game.knowledge[key] = true;
   npc.talked++;
   sfx.clue();
-  game.log.push({ text: factText(key, city.party), rumor: false });
+  game.log.push({ text: factText(key, city.party) });
 
   let text = realLine(rng, npc.kind, key, city.party);
   if (npc.kind === 'witch' && game.knowledge.district && game.knowledge.col && game.knowledge.row
@@ -320,24 +324,19 @@ function talk(game, npc) {
   toast(game, 'CLUE', '#c9a8ff', true);
 }
 
-function pet(game, cat) {
-  const { rng } = game;
-  if (cat.used) {
-    game.dialogue = { name: 'BLACK CAT', nameColor: '#ffd24a', text: 'The cat is done with you.' };
-    return;
-  }
+/**
+ * The cat does not wait to be asked.  You walk into it, the blood comes down
+ * over everything, and when it has run off the bottom you are looking at the
+ * other city.  No dialogue box: stopping the game dead would waste the
+ * seconds it just gave you.
+ */
+function lendVision(game, cat) {
   cat.used = true;
-  const refresh = game.vision > 0;
   game.vision = VISION_SECONDS;
+  game.bleed = VISION_BLEED;
   sfx.mana();
-  game.dialogue = {
-    name: 'BLACK CAT', nameColor: '#ffd24a',
-    text: catLine(rng) + (refresh
-      ? '  It looks at you again, harder, and the minute starts over.'
-      : '  Then it holds your eye for slightly too long, and the colour goes ' +
-        'out of the street. Now you can see who else is out here. One minute.'),
-  };
-  toast(game, 'VAMPIRE VISION  -  60 SECONDS', '#e8452f', true);
+  toast(game, `VAMPIRE VISION  -  ${VISION_SECONDS} SECONDS`, '#e8452f', true);
+  toast(game, catLine(game.rng), '#ffd24a');
 }
 
 // ---------------------------------------------------------------------------

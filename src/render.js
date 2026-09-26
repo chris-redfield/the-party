@@ -1,17 +1,17 @@
 import {
   CELL, GRID, WORLD, ROAD, WALK, CORE0, CORE1, RING0, RING1, CROSS0, CROSS1,
   VIEW_W, VIEW_H, PX, RA, RB, BASS_RADIUS, LIGHTING, DAWN_TINT, COLOR_DOORS,
-  BUMP_ANIM,
+  BUMP_ANIM, VISION_BLEED, VISION_STEPS,
 } from './config.js';
 import { makeRng } from './rng.js';
-import { personSprite, catSprite, batSprite } from './sprites.js';
+import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
 
 // --- palette ---------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Two cities.  The left column is what anybody sees; the right column is what
 // a vampire sees when a cat has lent it the eyes.  Every frame the live
-// palette `C` is lerped between them by `visionMix`, so the changeover fades
+// palette `C` is lerped between them by `sceneMix`, so the changeover fades
 // for free and nothing downstream has to know which mode it is in.
 // ---------------------------------------------------------------------------
 const PALETTES = {
@@ -55,6 +55,14 @@ const PALETTES = {
   litWindowPale:  ['#e8cf8a', '#b8362c'],
   litSkylight:    ['#e0bd52', '#d04a34'],
   lamp:           ['#ffd781', '#f2553c'],
+  // the lamp is a bulb in a box until a cat shows you it was always a fire
+  torchCup:       ['#33354a', '#2a2724'],
+  flameCore:      ['#ffe7bc', '#ffe2b0'],
+  flameMid:       ['#ffb347', '#f2553c'],
+  flameOuter:     ['#c98a2a', '#8e1f1f'],
+  // the yellow crosshair the road markings make at a four-way junction
+  hellCross:      ['#b09433', '#e8452f'],
+  hellCrossDark:  ['#6a5a1e', '#4a1109'],
   // decorations
   decoPumpkin:    ['#e08a26', '#b4b4b4'],
   decoCobweb:     ['#b9b9cc', '#9a9a9a'],
@@ -66,7 +74,13 @@ const PALETTES = {
 
 /** Live palette, rebuilt once per frame by applyVision(). */
 const C = {};
+// Two readings of the same changeover.  `visionMix` is the true, continuous
+// one and belongs to anything alive - people fade properly, because a person
+// moving in steps reads as a dropped frame rather than as the world changing.
+// `sceneMix` is the same number snapped to a handful of stages, and the city
+// is drawn from that, so the street comes back in jerks.
 let visionMix = 0;
+let sceneMix = 0;
 
 function lerpHex(a, b, t) {
   if (t <= 0) return a;
@@ -80,7 +94,8 @@ export { lerpHex };
 
 function applyVision(mix) {
   visionMix = mix;
-  for (const k in PALETTES) C[k] = lerpHex(PALETTES[k][0], PALETTES[k][1], mix);
+  sceneMix = Math.round(mix * VISION_STEPS) / VISION_STEPS;
+  for (const k in PALETTES) C[k] = lerpHex(PALETTES[k][0], PALETTES[k][1], sceneMix);
 }
 applyVision(0);
 
@@ -185,6 +200,31 @@ function drawGround(ctx, o, cells) {
       ctx.fillRect(X(s), Y(CROSS0 + 4), 12 * z, (CROSS1 - CROSS0 - 8) * z);
     if (cy > 0) for (let s = 6; s < ROAD - 6; s += 22)
       ctx.fillRect(X(CROSS0 + 4), Y(s), (CROSS1 - CROSS0 - 8) * z, 12 * z);
+
+    // Where two roads meet, the yellow markings cross in the middle of the
+    // junction and make a neat little crosshair.  Vampire vision burns that
+    // out of the asphalt and stands a cross up in its place, upside down.
+    // Road paint only - the zebra crossings are also the surface you are
+    // allowed to walk on, so those do not move a pixel.
+    if (sceneMix > 0.01) {
+      const jx = X(ROAD / 2), jy = Y(ROAD / 2);
+      ctx.save();
+      ctx.globalAlpha = sceneMix;
+      ctx.fillStyle = C.asphalt;                   // wipe the crosshair away
+      ctx.fillRect(X(0), Y(0), ROAD * z, ROAD * z);
+      // Long arm up, short arm down: Saint Peter's, the wrong way up.  The
+      // bar lies exactly along the horizontal lane markings and runs the full
+      // width of the junction, and the stem lies along the vertical ones, so
+      // the figure is continuous with the road paint it grew out of instead
+      // of sitting just off it.
+      ctx.fillStyle = C.hellCrossDark;
+      ctx.fillRect(jx - 7 * z, jy - 143 * z, 14 * z, 198 * z);
+      ctx.fillRect(X(4), jy - 7 * z, (ROAD - 8) * z, 14 * z);
+      ctx.fillStyle = C.hellCross;
+      ctx.fillRect(jx - 4 * z, jy - 140 * z, 8 * z, 192 * z);
+      ctx.fillRect(X(0), jy - 4 * z, ROAD * z, 8 * z);
+      ctx.restore();
+    }
 
     // scatter: manholes, leaves, spilled candy wrappers
     const rng = makeRng(cx * 7919 + cy * 104729 + 13);
@@ -319,10 +359,10 @@ function drawBuilding(ctx, block, o, city, t) {
   const Y = (w) => oy + (by + w) * z;
   const w = (CORE1 - CORE0) * z;
   const rng = makeRng(block.seed);
-  const base = lerpHex(block.base, block.baseM, visionMix);
-  const baseDark = lerpHex(block.baseDark, block.baseDarkM, visionMix);
-  const roof = lerpHex(block.roof, block.roofM, visionMix);
-  const roofLight = lerpHex(block.roofLight, block.roofLightM, visionMix);
+  const base = lerpHex(block.base, block.baseM, sceneMix);
+  const baseDark = lerpHex(block.baseDark, block.baseDarkM, sceneMix);
+  const roof = lerpHex(block.roof, block.roofM, sceneMix);
+  const roofLight = lerpHex(block.roofLight, block.roofLightM, sceneMix);
 
   // a hard shadow on the pavement so the mass reads as solid
   ctx.fillStyle = C.coreShadow;
@@ -442,14 +482,39 @@ export function lampPositions(block) {
   ];
 }
 
-function drawLamp(ctx, lx, ly, o) {
+function drawLamp(ctx, lx, ly, o, t) {
   const { ox, oy, z } = o;
   const sx = ox + lx * z, sy = oy + ly * z;
   ctx.fillStyle = C.lampPole;
   ctx.fillRect(sx - 3 * z, sy - 58 * z, 6 * z, 58 * z);
   ctx.fillRect(sx - 8 * z, sy - 3 * z, 16 * z, 4 * z);
-  ctx.fillStyle = C.lamp;          // the bulb: one of the two things still lit
-  ctx.fillRect(sx - 7 * z, sy - 66 * z, 14 * z, 9 * z);
+  if (sceneMix < 1) {             // the bulb: one of the two things still lit
+    ctx.save();
+    ctx.globalAlpha = 1 - sceneMix;
+    ctx.fillStyle = C.lamp;
+    ctx.fillRect(sx - 7 * z, sy - 66 * z, 14 * z, 9 * z);
+    ctx.restore();
+  }
+  // and underneath the bulb, all night, it was a torch
+  if (sceneMix > 0.01) drawFlame(ctx, sx, sy - 58 * z, z, t, lx * 0.017 + ly * 0.011);
+}
+
+const FLAME_ROWS = 9;
+
+/** A guttering fire, drawn in the same chunky rows as everything else. */
+function drawFlame(ctx, sx, sy, z, t, phase) {
+  ctx.save();
+  ctx.globalAlpha = sceneMix;
+  ctx.fillStyle = C.torchCup;
+  ctx.fillRect(sx - 8 * z, sy - 6 * z, 16 * z, 6 * z);
+  for (let i = 0; i < FLAME_ROWS; i++) {
+    const u = i / (FLAME_ROWS - 1);            // 0 at the cup, 1 at the tip
+    const w = (13 - u * 10) * (1 + 0.16 * Math.sin(t * 9 + phase + u * 5));
+    const dx = Math.sin(t * 6.5 + phase + u * 4) * u * 4;
+    ctx.fillStyle = u < 0.3 ? C.flameCore : (u < 0.68 ? C.flameMid : C.flameOuter);
+    ctx.fillRect(sx + dx * z - (w / 2) * z, sy - 6 * z - (i + 1) * 3 * z, w * z, 3 * z);
+  }
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
@@ -479,16 +544,46 @@ function bubble(ctx, text, sx, sy, z) {
   ctx.fillText(text, sx, sy - 6);
 }
 
+function drawSprite(ctx, cv, sx, sy, alpha) {
+  if (alpha <= 0) return;
+  if (alpha < 1) { ctx.save(); ctx.globalAlpha = alpha; }
+  ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - cv.anchorY));
+  if (alpha < 1) ctx.restore();
+}
+
+// A monster holds its costume until the changeover is most of the way in and
+// then swaps over quickly.  A long slow dissolve between two different
+// silhouettes does not read as a disguise coming off, it reads as a bug.
+function swapAt(mix) { return Math.max(0, Math.min(1, (mix - 0.3) / 0.4)); }
+
 function drawPerson(ctx, e, o, t) {
   const { ox, oy, z } = o;
-  const float = e.spec && e.spec.float;
-  const lift = float ? 4 + Math.sin(t * 2 + (e.bob || 0)) * 3 : 0;
-  const sx = ox + e.x * z, sy = oy + e.y * z - lift * z;
-  // real monsters cast no shadow. that is the tell.
-  if (!float) shadow(ctx, ox + e.x * z, oy + e.y * z, z, 9);
-  const cv = personSprite(e.spec, e.dir || 'down', e.frame === undefined ? -1 : e.frame, PX * z);
-  ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - cv.anchorY));
-  if (e.sayT > 0 && e.say) bubble(ctx, e.say, sx, sy - 52 * z, z);
+  const gx = ox + e.x * z, gy = oy + e.y * z;      // where the feet actually are
+  const dir = e.dir || 'down';
+  const frame = e.frame === undefined ? -1 : e.frame;
+  const scale = PX * z;
+
+  if (e.disguise) {
+    const swap = swapAt(visionMix);
+    // it only leaves the ground once it has stopped pretending
+    const lift = (4 + Math.sin(t * 2 + (e.bob || 0)) * 3) * swap;
+    const sy = gy - lift * z;
+    // real monsters cast no shadow. that is the tell, once you can see them.
+    if (swap < 1) shadow(ctx, gx, gy, z, 9, 0.35 * (1 - swap));
+    if (swap < 1) {
+      const kid = personSprite(e.disguise, dir, frame, scale);
+      drawSprite(ctx, kid, gx, sy, 1);
+      drawSprite(ctx, greySprite(kid), gx, sy, visionMix);   // drains like any child
+    }
+    if (swap > 0) drawSprite(ctx, personSprite(e.spec, dir, -1, scale), gx, sy, swap);
+  } else {
+    shadow(ctx, gx, gy, z, 9);
+    const cv = personSprite(e.spec, dir, frame, scale);
+    drawSprite(ctx, cv, gx, gy, 1);
+    // the living go black and white. only the monsters keep their colour.
+    if (visionMix > 0) drawSprite(ctx, greySprite(cv), gx, gy, visionMix);
+  }
+  if (e.sayT > 0 && e.say) bubble(ctx, e.say, gx, gy - 52 * z, z);
 }
 
 // ---------------------------------------------------------------------------
@@ -528,15 +623,14 @@ export function drawScene(ctx, cam, game) {
   for (const { cx, cy } of cells) {
     const block = city.blockAt(cx, cy);
     list.push({ y: cy * CELL + CORE1, fn: () => drawBuilding(ctx, block, o, city, clock.t) });
-    for (const l of lampPositions(block)) list.push({ y: l.y, fn: () => drawLamp(ctx, l.x, l.y, o) });
+    for (const l of lampPositions(block)) list.push({ y: l.y, fn: () => drawLamp(ctx, l.x, l.y, o, clock.t) });
   }
   const inView = (e) => e.x > cam.x - halfW && e.x < cam.x + halfW
     && e.y > cam.y - halfH && e.y < cam.y + halfH;
 
   for (const k of world.kids) if (inView(k)) list.push({ y: k.y, fn: () => drawPerson(ctx, k, o, clock.t) });
+  // monsters are standing there the whole night, dressed as somebody's kid
   for (const n of world.npcs) {
-    // real monsters are standing there the whole night. you just cannot see them.
-    if (n.real && visionMix <= 0.02) continue;
     if (inView(n)) list.push({ y: n.y, fn: () => drawNpc(ctx, n, o, clock.t) });
   }
   for (const c of world.cats) if (inView(c)) list.push({ y: c.y, fn: () => drawCat(ctx, c, o, clock.t) });
@@ -550,29 +644,32 @@ export function drawScene(ctx, cam, game) {
 }
 
 function drawNpc(ctx, n, o, t) {
-  ctx.save();
-  if (n.real) ctx.globalAlpha = Math.min(1, visionMix * 1.25);
   drawPerson(ctx, { ...n, dir: 'down', frame: -1 }, o, t);
-  if (n.real) {
-    // no shadow, but a faint ring of nothing-in-particular on the ground it is
-    // not standing on.  Readable once you know to look for it.
-    const { ox, oy, z } = o;
-    ctx.globalAlpha = (0.20 + 0.08 * Math.sin(t * 3 + n.bob)) * visionMix;
-    ctx.strokeStyle = n.spec.glow;
-    ctx.lineWidth = Math.max(1, 2 * z);
-    ctx.beginPath();
-    ctx.ellipse(ox + n.x * z, oy + n.y * z, 12 * z, 5 * z, 0, 0, 6.2832);
-    ctx.stroke();
-  }
+  const ring = swapAt(visionMix);
+  if (ring <= 0) return;
+  // no shadow, but a faint ring of nothing-in-particular on the ground it is
+  // not standing on.  Readable once you know to look for it.
+  const { ox, oy, z } = o;
+  ctx.save();
+  ctx.globalAlpha = (0.20 + 0.08 * Math.sin(t * 3 + n.bob)) * ring;
+  ctx.strokeStyle = n.spec.glow;
+  ctx.lineWidth = Math.max(1, 2 * z);
+  ctx.beginPath();
+  ctx.ellipse(ox + n.x * z, oy + n.y * z, 12 * z, 5 * z, 0, 0, 6.2832);
+  ctx.stroke();
   ctx.restore();
 }
 
+// Cats are a thing of ordinary sight.  The other way of looking does not
+// include them at all - they go out of the street as the colour does, and
+// come back as it comes back, which is presumably how they prefer it.
 function drawCat(ctx, c, o, t) {
+  const a = 1 - visionMix;
+  if (a <= 0.02) return;
   const { ox, oy, z } = o;
   const sx = ox + c.x * z, sy = oy + c.y * z;
-  shadow(ctx, sx, sy, z, 7, 0.28);
-  const cv = catSprite(c.used ? '#6a6a72' : c.eye, PX * z);
-  ctx.drawImage(cv, Math.round(sx - cv.anchorX), Math.round(sy - cv.anchorY));
+  shadow(ctx, sx, sy, z, 7, 0.28 * a);
+  drawSprite(ctx, catSprite(c.used ? '#6a6a72' : c.eye, PX * z), sx, sy, a);
 }
 
 function drawPlayer(ctx, p, o, t) {
@@ -713,6 +810,76 @@ function drawLighting(ctx, o, cells, game) {
 }
 
 /** The sky starting to kill you.  Not scenery mood - it is the timer. */
+// ---------------------------------------------------------------------------
+// The blood
+// ---------------------------------------------------------------------------
+// A cat lends you the eyes and it comes down the screen as blood: a sheet
+// pouring from the top on runs of different lengths, each ending in a heavy
+// rounded drop, with a few already falling free of it.  It covers everything
+// for a beat and then slides off the bottom, and the city it uncovers is not
+// the one it covered.  Drawn over the HUD as well, because it is happening to
+// you and not to the city.
+const BLOOD_RED = '#cf1206';
+const BLEED_DRIP = 96;             // how far the longest run reaches
+
+const RUNS = (() => {
+  const rng = makeRng(0xb1005d);
+  const out = [];
+  for (let x = -24; x < VIEW_W + 48; x += 42) {
+    out.push({
+      x: Math.round(x + rng.range(-9, 9)),
+      w: Math.round(rng.range(16, 38) / 4) * 4,   // keep the widths chunky
+      len: rng.range(0.22, 1),
+      lag: rng.range(0, 0.30),                    // runs do not all start together
+      drop: rng.chance(0.4),
+    });
+  }
+  return out;
+})();
+
+// It falls, so it accelerates: the edge creeps at the top where you can watch
+// the runs form, and is moving by the time it reaches the bottom.  Once it has
+// the whole screen it does not drain anywhere - it just goes, and what is
+// underneath was never the city you were looking at.
+const POUR_END = 0.62;             // covered by here
+const FADE_START = 0.72;           // holds until here, then goes
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+export function drawBleed(ctx, game) {
+  if (!game.bleed) return;
+  const u = 1 - game.bleed / VISION_BLEED;          // 0..1 through the pour
+  const alpha = u < FADE_START
+    ? 1 : Math.pow(1 - (u - FADE_START) / (1 - FADE_START), 1.4);
+  if (alpha <= 0.01) return;
+  const pour = Math.min(1, u / POUR_END);
+  const lead = Math.pow(pour, 1.7) * (VIEW_H + BLEED_DRIP);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = BLOOD_RED;
+  ctx.fillRect(0, 0, VIEW_W, Math.min(VIEW_H, lead));
+
+  if (lead <= VIEW_H) {                            // runs, while the edge shows
+    ctx.beginPath();
+    for (const d of RUNS) {
+      const grow = easeOut(Math.max(0, Math.min(1, (pour - d.lag) / (1 - d.lag))));
+      const len = d.len * BLEED_DRIP * grow;
+      const r = d.w / 2;
+      if (len <= r) continue;
+      ctx.rect(d.x - r, lead, d.w, len - r);       // the run
+      ctx.moveTo(d.x + r, lead + len - r);         // the drop on the end of it
+      ctx.arc(d.x, lead + len - r, r, 0, 6.2832);
+      if (d.drop) {                                // and one already falling
+        const dr = Math.max(3, r * 0.62);
+        const dy = lead + len + 22 + grow * 70;
+        if (dy - dr < VIEW_H) { ctx.moveTo(d.x + dr, dy); ctx.arc(d.x, dy, dr, 0, 6.2832); }
+      }
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawDawn(ctx, clock) {
   const dawn = Math.max(0, (clock.minutes - 270) / 90);   // from ~4:30 AM
   if (dawn <= 0) return;

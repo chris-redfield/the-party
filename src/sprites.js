@@ -340,4 +340,28 @@ export function batSprite(frame, scale) {
   return cv;
 }
 
-export function clearSpriteCache() { cache.clear(); }
+export function clearSpriteCache() { cache.clear(); greyCache = new WeakMap(); }
+
+// ---------------------------------------------------------------------------
+// Greyscale twins
+// ---------------------------------------------------------------------------
+// Under vampire vision the living are drained of colour and only the monsters
+// keep theirs.  Rather than rebuild a sprite per colour, every canvas gets one
+// grey twin, built once and drawn over the top at whatever alpha the
+// changeover is at - identical silhouette, so it reads as a desaturation.
+let greyCache = new WeakMap();
+
+export function greySprite(cv) {
+  let g = greyCache.get(cv);
+  if (g) return g;
+  g = document.createElement('canvas');
+  g.width = cv.width; g.height = cv.height;
+  const ctx = g.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.filter = 'grayscale(1)';
+  ctx.drawImage(cv, 0, 0);
+  ctx.filter = 'none';
+  g.anchorX = cv.anchorX; g.anchorY = cv.anchorY;
+  greyCache.set(cv, g);
+  return g;
+}

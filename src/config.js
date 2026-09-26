@@ -52,9 +52,30 @@ export const COLOR_DOORS = true;
 // you the other way of looking at it: everything drains to grey, every light
 // burns red, and the things that were always standing on the pavement become
 // visible.  It does not last.
-export const VISION_SECONDS = 60;
-export const VISION_FADE = 1.2;        // seconds to bleed in and back out
-export const VISION_WARN = 10;         // when the HUD starts flashing at you
+export const VISION_SECONDS = 30;
+export const VISION_FADE = 1.2;        // seconds to bleed IN at the start
+// The last 30% of it is spent bleeding back out: the colour creeps in, the
+// torches gutter, the monsters sink back into the crowd.  At zero you are all
+// the way back to ordinary sight.
+export const VISION_TAPER = 0.30;
+export const VISION_WARN = VISION_SECONDS * VISION_TAPER;   // HUD starts flashing
+// The cat's gift arrives as blood running down the screen: it pours in from
+// the top on dripping runs, covers everything for a beat, and then slides off
+// the bottom - by which time the city behind it has changed.
+export const VISION_BLEED = 1.5;
+// how much of the changeover has to have happened before a monster stops
+// looking like a child - the prompt and the picture use the same number
+export const REVEAL = 0.5;
+// The city does not change over smoothly.  The scenery - palette, buildings,
+// torches, the crosses at the junctions - snaps between this many fixed
+// stages instead of sliding, so the street comes back in jerks.  The people
+// are not on this clock: they fade properly, because a stepped person reads
+// as a dropped frame rather than as a change in the world.
+//
+// Against the wear-off this works out at a jump roughly every half second.
+// Fewer stages is nastier: each jump is bigger and lands less often.
+export const VISION_STEPS = 18;
+export const CAT_TOUCH = 26;           // walk this close and the cat does it
 
 // --- the night --------------------------------------------------------------
 export const NIGHT_SECONDS = 12 * 60;      // 12 real minutes ...
@@ -86,7 +107,10 @@ export const MIN_SPEED_MULT = 0.42;
 
 // --- population -------------------------------------------------------------
 export const KIDS_PER_BLOCK = [3, 6];
-export const NPCS_PER_BLOCK = [1, 3];
+// Real monsters, standing on the pavement all night dressed as trick-or-
+// treaters.  There are no adults out here, so these are the only things that
+// know anything, which is why there are more of them than there used to be.
+export const MONSTERS_PER_BLOCK = [0, 2];
 export const CAT_CHANCE = 0.45;            // per block
 export const SIM_RADIUS = 1400;            // entities further away idle
 
