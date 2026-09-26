@@ -1,7 +1,8 @@
 import {
   VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, GRID, CELL,
-  VISION_SECONDS, VISION_WARN,
+  VISION_SECONDS, VISION_WARN, GLASS_CLOCK_TEXT,
 } from './config.js';
+import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
 import { DISTRICTS } from './city.js';
 import { shortFact, cardFact, FACT_KEYS } from './hints.js';
 
@@ -59,22 +60,12 @@ export function drawHud(ctx, game) {
   if (player.followers > 0) candyLine += `   KIDS IN TOW ${player.followers}`;
   ctx.fillText(candyLine, 26, 94);
 
-  // --- clock --------------------------------------------------------------
+  // --- the hourglass ------------------------------------------------------
+  // No digits.  The moon in the top bulb is ground down into the sun in the
+  // bottom one, and when the sun is whole it is 6:00 AM.
   const left = NIGHT_MINUTES - clock.minutes;
   const panic = left < 60;
-  panel(ctx, VIEW_W - 268, 16, 252, 76, panic ? 0.92 : 0.86);
-  ctx.textAlign = 'right';
-  ctx.font = FONT(38);
-  ctx.fillStyle = panic ? (Math.floor(clock.t * 4) % 2 ? '#ff5a4a' : '#ffb24a') : '#f0e6ff';
-  ctx.fillText(clockText(clock.minutes), VIEW_W - 30, 58);
-  ctx.font = FONT(13);
-  ctx.fillStyle = '#b8a8d0';
-  ctx.fillText(panic ? 'THE SKY IS GETTING IDEAS' : 'SUNRISE AT 6:00 AM', VIEW_W - 30, 78);
-  // night progress
-  ctx.fillStyle = '#2a2038';
-  ctx.fillRect(VIEW_W - 268, 92, 252, 6);
-  ctx.fillStyle = panic ? '#ff7a3a' : '#6a4ab0';
-  ctx.fillRect(VIEW_W - 268, 92, 252 * (clock.minutes / NIGHT_MINUTES), 6);
+  drawClock(ctx, clock, panic);
 
   drawVision(ctx, game);
   drawMinimap(ctx, game);
@@ -106,6 +97,33 @@ export function drawHud(ctx, game) {
     ctx.fillText(t.text, VIEW_W / 2, VIEW_H * 0.36 - t.rise);
     ctx.globalAlpha = 1;
   }
+}
+
+// The whole clock: an hourglass in a panel, with a line of bad news under it.
+const CLOCK_PAD = 12;
+const CLOCK_W = GLASS_W + CLOCK_PAD * 2;
+const CLOCK_CAPTION = 46 + (GLASS_CLOCK_TEXT ? 24 : 0);
+const CLOCK_H = GLASS_H + CLOCK_PAD + CLOCK_CAPTION;
+
+function drawClock(ctx, clock, panic) {
+  const x = VIEW_W - 16 - CLOCK_W, y = 16;
+  panel(ctx, x, y, CLOCK_W, CLOCK_H, panic ? 0.92 : 0.86);
+  drawHourglass(ctx, x + CLOCK_PAD, y + CLOCK_PAD,
+                clock.minutes / NIGHT_MINUTES, clock.t, panic);
+
+  const hot = panic && Math.floor(clock.t * 4) % 2;
+  let ty = y + CLOCK_PAD + GLASS_H + 18;
+  ctx.textAlign = 'center';
+  if (GLASS_CLOCK_TEXT) {
+    ctx.font = FONT(20);
+    ctx.fillStyle = panic ? (hot ? '#ff5a4a' : '#ffb24a') : '#f0e6ff';
+    ctx.fillText(clockText(clock.minutes), x + CLOCK_W / 2, ty);
+    ty += 24;
+  }
+  ctx.font = FONT(11);
+  ctx.fillStyle = panic ? (hot ? '#ff5a4a' : '#ffb24a') : '#b8a8d0';
+  const caption = panic ? ['THE SKY IS', 'GETTING IDEAS'] : ['SUNRISE AT', '6:00 AM'];
+  caption.forEach((line, i) => ctx.fillText(line, x + CLOCK_W / 2, ty + i * 14));
 }
 
 function drawVision(ctx, game) {

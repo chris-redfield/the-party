@@ -89,6 +89,24 @@ the decoration is how you recognise the place if you stumble on it before you
 know where you are. Every fact narrows the minimap, and when one block is left
 the map says so.
 
+### The hourglass
+
+**There are no digits on the clock, because there is no clock.** The only thing
+telling you how much night is left stands in the top right corner: an hourglass
+made out of bone, with a skull for a cap and the sand running out between its
+teeth. The top bulb is the night — violet sand, a few stars in it, and a moon
+standing in the middle. The bottom bulb is what the night turns into.
+
+It is the same sand. The level in the top falls past the moon and eats it away
+grain by grain, and those grains come through the neck and build a sun back up
+in the bottom, from the tips of its lowest rays to the top of the disc. Half a
+moon and half a sun is three in the morning. No moon and a whole sun is 6:00
+AM. In the last hour the glass starts to crack, the sun goes white, and the
+skull's eye sockets catch the light that is coming for you.
+
+`GLASS_UNIT` in `src/config.js` is how big one of its art pixels is, and
+`GLASS_CLOCK_TEXT` puts the digits back underneath it if you want them.
+
 ### Vampire vision
 
 **You cannot see the monsters.** They have been standing on that pavement all
@@ -189,7 +207,8 @@ src/player.js       movement, bat form, the candy speed penalty
 src/hints.js        FACT_KEYS - the facts, and the dialogue around them
 src/game.js         state machine: clock, interactions, win and loss
 src/render.js       camera, city, and the ordinary / vampire-vision palettes
-src/hud.js          vitals, clock, minimap, the deck of tips, title and ends
+src/hud.js          vitals, minimap, the deck of tips, title and ends
+src/hourglass.js    the clock, which is a moon being ground into a sun
 src/audio.js        procedural sound - no audio files
 src/sprites.js      PLACEHOLDER ART. self-contained on purpose.
 src/input.js

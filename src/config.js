@@ -77,6 +77,13 @@ export const REVEAL = 0.5;
 export const VISION_STEPS = 18;
 export const CAT_TOUCH = 26;           // walk this close and the cat does it
 
+// --- the hourglass ----------------------------------------------------------
+// The clock is not a clock.  It is an hourglass with the moon in the top bulb
+// and the sun in the bottom, and the same sand makes one out of the other.
+export const GLASS_UNIT = 4;          // px per art pixel of the hourglass
+// The digits are gone on purpose.  Set true to put a readout back under it.
+export const GLASS_CLOCK_TEXT = false;
+
 // --- the night --------------------------------------------------------------
 export const NIGHT_SECONDS = 12 * 60;      // 12 real minutes ...
 export const NIGHT_MINUTES = 6 * 60;       // ... = midnight -> 6 AM
