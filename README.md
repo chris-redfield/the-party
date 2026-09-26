@@ -119,6 +119,30 @@ numbered from the west and from the north — there are a few dozen of each and
 they are not evenly spaced, so the minimap prints the address of the block you
 are standing on.
 
+### Dying
+
+There are two ways to lose — the blood runs out, or the sun comes up — and
+both of them land on the same screen, which is the one screen in the game
+that is not the game's palette at all. Flat blood red, edge to edge, the same
+`#cf1206` the cat's gift pours down the screen, because it is the same blood;
+it is just all outside you now. One word in black on it, `DEAD` or `ASH`, as
+big as the screen will take, and nothing else but the line telling you which
+key starts another night. You do not get told how it went. You get told that
+it is over.
+
+It is set in **Deathly**, the only real typeface in the game — everything
+else, down to the hourglass, is drawn out of code. It lives in `assets/` with
+its licence, and is loaded over the FontFace API rather than declared in the
+stylesheet, because canvas text does not redraw itself when a font arrives
+late: it sets in the fallback and stays there. `DEATH_SIZE` in `src/hud.js`
+is how big the word goes.
+
+> **Licence:** Deathly is 1001Fonts *Free For Personal Use*. That does not
+> cover commercial use — releasing this for money needs a licence from the
+> foundry, or a different face. Dystopian Canticle (SIL OFL, no such
+> restriction) is still in `assets/` and is a drop-in swap: change `FAMILY`,
+> `URL` and `SCALE` at the top of `src/deathtype.js`.
+
 ### The hourglass
 
 **There are no digits on the clock, because there is no clock.** The only thing

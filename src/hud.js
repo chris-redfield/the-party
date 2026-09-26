@@ -5,6 +5,9 @@ import {
 import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
 import { DISTRICTS, blockAt } from './city.js';
 import { shortFact, cardFact, addressOf, FACT_KEYS } from './hints.js';
+// the red the cat's gift pours down the screen, which is the red you dry into
+import { BLOOD_RED } from './render.js';
+import { deathText, deathWrap, setDeathFont } from './deathtype.js';
 
 const FONT = (px, bold = true) =>
   `${bold ? 'bold ' : ''}${px}px "Courier New", ui-monospace, monospace`;
@@ -478,33 +481,69 @@ export function drawTitle(ctx, t) {
 }
 
 export function drawEnd(ctx, game, t) {
-  const win = game.state === 'win';
-  ctx.fillStyle = win ? 'rgba(20,6,34,0.94)' : 'rgba(30,10,8,0.94)';
+  if (game.state !== 'win') { drawDeath(ctx, game, t); return; }
+
+  ctx.fillStyle = 'rgba(20,6,34,0.94)';
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   ctx.textAlign = 'center';
   ctx.font = FONT(64);
-  ctx.fillStyle = win ? '#e8c8ff' : '#ff9a6a';
-  ctx.fillText(win ? 'YOU FOUND IT' : game.endTitle, VIEW_W / 2, 230);
+  ctx.fillStyle = '#e8c8ff';
+  ctx.fillText('YOU FOUND IT', VIEW_W / 2, 230);
   ctx.font = FONT(20, false);
   ctx.fillStyle = '#e0d4f0';
   wrapCentered(ctx, game.endText, VIEW_W / 2, 290, 820, 30);
 
   ctx.font = FONT(17);
   ctx.fillStyle = '#b8a8d0';
-  const stats = [
-    `time:   ${clockText(game.clock.minutes)}`,
-    `doors:  ${game.stats.knocks} knocked`,
-    `candy:  ${game.player.candy} pieces carried`,
-    `clues:  ${FACT_KEYS.filter(k => game.knowledge[k]).length} of ${FACT_KEYS.length}`,
-    `party:  ${DISTRICTS[game.city.party.districtIdx].name}, ` +
-      addressOf(game.city.party.block),
-    `door:   the one with ${game.city.party.deco.name}`,
-  ];
-  stats.forEach((s, i) => ctx.fillText(s, VIEW_W / 2, 440 + i * 26));
+  endStats(game).forEach(([k, v], i) => {
+    ctx.fillText(`${k}  ${v}`, VIEW_W / 2, 440 + i * 26);
+  });
 
   ctx.font = FONT(20);
   ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffd24a' : '#a07ad8';
   ctx.fillText('PRESS ENTER FOR ANOTHER NIGHT', VIEW_W / 2, VIEW_H - 50);
+}
+
+function endStats(game) {
+  return [
+    ['time', clockText(game.clock.minutes)],
+    ['doors', `${game.stats.knocks} knocked`],
+    ['candy', `${game.player.candy} pieces carried`],
+    ['clues', `${FACT_KEYS.filter(k => game.knowledge[k]).length} of ${FACT_KEYS.length}`],
+    ['party', `${DISTRICTS[game.city.party.districtIdx].name}, ${addressOf(game.city.party.block)}`],
+    ['door', `the one with ${game.city.party.deco.name}`],
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Dried
+// ---------------------------------------------------------------------------
+// The one screen in the game that is not the game's palette at all: flat
+// blood red, edge to edge, with one word cut out of it in black.  It is the
+// same red the cat's gift pours down the screen, because it is the same
+// blood - it is just all outside you now.  Nothing else is on it.  You do
+// not get told how it went; you get told that it is over.
+const MID = VIEW_W / 2;
+const DEATH_SIZE = 260;          // as big as the word will go ...
+const DEATH_MAX_W = 940;         // ... until it runs out of screen
+
+function drawDeath(ctx, game, t) {
+  ctx.fillStyle = BLOOD_RED;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.fillStyle = '#000000';
+
+  // one word, set as large as it will go and stood in the middle of the red
+  const word = game.endTitle.toUpperCase();
+  setDeathFont(ctx, DEATH_SIZE);
+  const wide = ctx.measureText(word).width;
+  const size = wide > DEATH_MAX_W ? DEATH_SIZE * (DEATH_MAX_W / wide) : DEATH_SIZE;
+  setDeathFont(ctx, size);
+  const cap = ctx.measureText('H').actualBoundingBoxAscent || size * 0.72;
+  deathText(ctx, word, MID, VIEW_H / 2 + cap / 2, size);
+
+  if (Math.floor(t * 2) % 2) {
+    deathText(ctx, 'PRESS ENTER FOR ANOTHER NIGHT', MID, VIEW_H - 46, 30);
+  }
 }
 
 function wrapCentered(ctx, text, cx, y, maxW, lh) {

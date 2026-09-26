@@ -430,7 +430,7 @@ function drawLighting(ctx, o, blocks, game) {
 // for a beat and then slides off the bottom, and the city it uncovers is not
 // the one it covered.  Drawn over the HUD as well, because it is happening to
 // you and not to the city.
-const BLOOD_RED = '#cf1206';
+export const BLOOD_RED = '#cf1206';
 const BLEED_DRIP = 96;             // how far the longest run reaches
 
 const RUNS = (() => {

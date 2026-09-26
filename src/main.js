@@ -6,6 +6,7 @@ import { FACT_KEYS } from './hints.js';
 import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
 import { drawHud, drawTitle, drawEnd, cardAt } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity } from './audio.js';
+import { loadDeathFonts } from './deathtype.js';
 
 const canvas = document.getElementById('game');
 canvas.width = VIEW_W; canvas.height = VIEW_H;
@@ -19,6 +20,11 @@ function fit() {
 }
 window.addEventListener('resize', fit);
 fit();
+
+// The death screen is set in a real typeface, which has to be fetched before
+// anything can be drawn with it.  Nothing waits on this: it is wanted minutes
+// into a night at the earliest, and until it lands the screen sets in serif.
+loadDeathFonts();
 
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');

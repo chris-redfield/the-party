@@ -216,7 +216,7 @@ export function updateGame(game, dt, input) {
   for (const t of game.toasts) { t.life -= dt; t.rise += dt * 26; }
   game.toasts = game.toasts.filter(t => t.life > 0);
 
-  if (p.blood <= 0) die(game, 'DRY',
+  if (p.blood <= 0) die(game, 'DEAD',
     'You spent your last on wings. A vampire with no blood is just a bad coat ' +
     'full of dust on a pavement that nobody sweeps.');
 }
