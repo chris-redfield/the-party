@@ -1,5 +1,5 @@
 import {
-  KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, LIAR_CHANCE,
+  KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, CAT_RISE, CAT_STRIDE, LIAR_CHANCE,
   PUMPKINS_PER_BLOCK, PUMPKIN_CROSSING_CHANCE, PUMPKIN_R, PUMPKIN_BLOCK,
   PUMPKIN_LAT, PUMPKIN_CROSS_LAT,
 } from './config.js';
@@ -172,6 +172,9 @@ export function populate(rng, city) {
         kind: 'cat', block, t, lat,
         x: p.x, y: p.y, dir: rng.chance(0.5) ? 1 : -1,
         speed: rng.range(10, 26), pause: rng.range(0, 4),
+        // what it is doing with itself: sitting, up but not going anywhere
+        // yet, or walking.  `step` counts strides, not seconds.
+        pose: 'sit', rise: 0, step: rng.range(0, 2), faceLeft: rng.chance(0.5),
         // every cat carries the same thing now: the other way of seeing
         used: false, eye: rng.pick(['#ffd23a', '#ffe98a', '#9bff6a']),
       });
@@ -225,10 +228,37 @@ export function updateKid(k, dt, player) {
   }
 }
 
+/**
+ * A cat sits, gets up, stands there a moment, walks, and sooner or later sits
+ * back down - three poses rather than the one the coded sprite had.  The
+ * standing beat is the point of it: an animal that went from sitting to
+ * walking on the same frame reads as a sprite being dragged, and CAT_RISE is
+ * how long it holds that pose before it commits to going anywhere.
+ *
+ * Which way it is facing is taken from the ground it covers rather than from
+ * `dir`, because `dir` is which way round the block it is going and a block
+ * has four sides: the same `dir` walks it left along one and right along the
+ * other.  On the sides where it is walking straight up or down the screen
+ * there is nothing to take, so it keeps whichever way it last faced.
+ */
 export function updateCat(c, dt) {
-  if (c.pause > 0) { c.pause -= dt; return; }
+  if (c.pause > 0) {                         // sitting down
+    c.pose = 'sit';
+    c.pause -= dt;
+    if (c.pause <= 0) c.rise = CAT_RISE[0] + Math.random() * (CAT_RISE[1] - CAT_RISE[0]);
+    return;
+  }
+  if (c.rise > 0) {                          // on its feet, not moving yet
+    c.pose = 'stand';
+    c.rise -= dt;
+    return;
+  }
+  c.pose = 'walk';
+  const x0 = c.x;
   c.t += c.dir * c.speed * dt;
   const p = ringPoint(c.block, c.t, c.lat);
   c.x = p.x; c.y = p.y;
+  c.step += (c.speed * dt) / CAT_STRIDE;     // ringPoint is arc length: t is px
+  if (Math.abs(c.x - x0) > 0.02) c.faceLeft = c.x < x0;
   if (Math.random() < 0.004) { c.pause = 1 + Math.random() * 3; c.dir *= -1; }
 }

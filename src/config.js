@@ -195,6 +195,17 @@ export const LIAR_CHANCE = 0.5;
 export const MAX_TIPS = 5;
 export const CAT_CHANCE = 0.45;            // per block
 
+// A cat does not go from sitting to walking.  It gets up, and it stands there
+// on all four feet for a second or so looking at nothing, and then it goes -
+// which is the whole of what makes a drawn animal read as an animal rather
+// than as a sprite being moved about.  Both ends of the range are used: a
+// street of cats that all hold it for exactly a second looks synchronised.
+export const CAT_RISE = [1.0, 1.5];        // seconds up before it moves
+// Its walk is paced by the pavement rather than by the clock: this many
+// pixels of ground per change of pose, so a slow cat plods and a quick one
+// does not moonwalk.
+export const CAT_STRIDE = 7;
+
 // --- pumpkins in the way -----------------------------------------------------
 // Somebody has left them out on the pavement and on the crossings.  They are
 // about as big as a trick-or-treater and they are solid, but they never take

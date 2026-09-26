@@ -502,6 +502,28 @@ src/input.js
 src/main.js         loop and wiring
 ```
 
+The cat is `assets/party-cat-01.png`, four drawings in a column: sitting,
+standing, and two of the walk. It is the one drawing here that is deliberately
+**not** the size of the sprite it replaces — the coded cat is 14 × 12 art
+pixels and `CAT_BOX` is 40% over that, because a correctly sized cat is a cat
+nobody notices. The sheet faces left, so it is the cat walking right that is
+mirrored, and which way it faces is taken from the ground it covers rather
+than from `dir` (that is which way round the block it is going, and a block
+has four sides).
+
+`updateCat()` gives it the three states the sheet is drawn for: it sits, it
+gets up, and it **holds that standing pose for `CAT_RISE` — a second to a
+second and a half — before it goes anywhere**. That beat is the point of it:
+an animal that goes from sitting to walking on the same frame reads as a
+sprite being dragged about. The walk is paced by `CAT_STRIDE` pixels of
+pavement per pose rather than by the clock, so a slow cat plods. Both
+constants are in `src/config.js`.
+
+One thing the swap costs: cats used to have their own eye colours, and the
+drawing's eyes are red for all of them. A cat you have already brushed against
+still shows it — the red drains out of the drawing (the grey twin, drawn over
+the top) where the coded sprite used to swap the colour.
+
 `src/sprites.js` knows what everybody in the city looks like, and builds every
 one of them out of small colour grids at load time. To swap in real art,
 replace `personSprite`, `catSprite` and `batSprite` with something that returns
@@ -535,8 +557,8 @@ characters in proportion to each other rather than in proportion to whatever
 the files were exported at, and both are written off `VAMP_BOX` so that
 changing the player's height keeps the three of them in proportion: **the
 witch stands a fifth taller than the vampire you play** (120% of him, measured
-off the drawings) and **the nosferatu stands exactly his height**, wider in the
-shoulders and nothing else. Neither is ever seen outside vampire vision: out
+off the drawings) and **the nosferatu comes in a tenth under him** (90%), wider
+in the shoulders and nothing else. Neither is ever seen outside vampire vision: out
 of it they are wearing a child's costume like every other monster, and that
 costume is still built out of code. They keep their colour when the street
 drains, the way every monster does.

@@ -40,6 +40,11 @@ const NOSFERATU_SHEET = 'assets/party-nosferatu-01.png';
 // cell for standing still.
 const CHILD_WITCH_SHEET = 'assets/party-child-001.png';
 
+// And the cat.  Four drawings in a column: sitting, up on its feet, and two
+// of the walk.  They all face left, so it is the cat walking right that is
+// the mirrored one.
+const CAT_SHEET = 'assets/party-cat-01.png';
+
 // How tall he stands, in the same art pixels everybody else is measured in.
 // The trick-or-treaters are 28 and he is a little over them - he is the one
 // adult out here, and the cape needs the room.
@@ -54,10 +59,10 @@ export const VAMP_BOX = 33;
 // the vampire you play, off his box rather than off a number of her own, so
 // changing his height keeps the pair in proportion.
 export const WITCH_BOX = VAMP_BOX * 1.2;
-// The nosferatu is not scaled up the way she is: he stands exactly as tall as
-// the vampire you play, which is what makes him read as one of your own kind
-// rather than as one of hers.
-export const NOSFERATU_BOX = VAMP_BOX;
+// The nosferatu is not scaled up the way she is: he comes in a tenth under the
+// vampire you play, close enough to read as one of your own kind rather than
+// as one of hers, and short enough that he is not the one you look at first.
+export const NOSFERATU_BOX = VAMP_BOX * 0.9;
 // The child in the witch costume is the one size in here that is not a
 // judgement call: it is what the coded kid she replaces already measures on
 // the pavement, 16 x 24 art pixels from the tip of the hat to her shoes.  The
@@ -65,6 +70,14 @@ export const NOSFERATU_BOX = VAMP_BOX;
 // not how big she is - a child who grew when the art landed would move every
 // crowd she stands in.
 export const CHILD_WITCH_BOX = 24;
+// The cat is the one of these that is deliberately not the size of the sprite
+// it replaces.  The coded cat measures 14 x 12 art pixels and the drawing was
+// matched to it at first, which made a correct-looking cat that nobody would
+// ever notice; asked for, and wanted, is an animal with some presence on the
+// pavement, so it is a round 40% over that.  The box is its walk, the tallest
+// thing on the sheet, which leaves it sitting a little lower than it stands,
+// as a cat does.
+export const CAT_BOX = 12 * 1.4;
 
 // A pixel this close to white, reachable from outside the drawing, is
 // background.  The scan is generous because the sheet has soft edges.
@@ -85,6 +98,7 @@ export async function loadArtwork() {
     sheet('witch', WITCH_SHEET, 1, 1),
     sheet('nosferatu', NOSFERATU_SHEET, 1, 1),
     sheet('childWitch', CHILD_WITCH_SHEET, 1, 3),
+    sheet('cat', CAT_SHEET, 1, 4),
   ]);
 }
 
@@ -106,6 +120,7 @@ export const vampArtReady = () => !!sheets.vamp;
 export const witchArtReady = () => !!sheets.witch;
 export const nosferatuArtReady = () => !!sheets.nosferatu;
 export const childWitchArtReady = () => !!sheets.childWitch;
+export const catArtReady = () => !!sheets.cat;
 
 function cut(img, COLS, ROWS) {
   const cw = Math.floor(img.width / COLS), ch = Math.floor(img.height / ROWS);
@@ -253,6 +268,22 @@ export function childWitchFrame(frame, anim, scale) {
   const cell = sh.grid[row][0];
   if (!cell) return null;
   return scaled(`childWitch|${row}`, cell, sh, CHILD_WITCH_BOX, false, scale);
+}
+
+// Which drawing the cat is standing in.  `pose` is the animal's own state -
+// see updateCat() - and `step` counts strides rather than seconds, so the
+// walk is paced by the ground it covers.
+const CAT_SIT = 0, CAT_STAND = 1, CAT_WALK = [2, 3];
+
+export function catArt(pose, step, faceLeft, scale) {
+  const sh = sheets.cat;
+  if (!sh) return null;
+  const row = pose === 'sit' ? CAT_SIT
+    : pose === 'stand' ? CAT_STAND
+    : CAT_WALK[Math.floor(step || 0) % CAT_WALK.length];
+  const cell = sh.grid[row][0];
+  if (!cell) return null;
+  return scaled(`cat|${row}`, cell, sh, CAT_BOX, !faceLeft, scale);
 }
 
 function still(name, box, scale) {

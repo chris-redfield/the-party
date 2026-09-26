@@ -5,7 +5,7 @@ import {
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
-import { vampFrame, witchArt, nosferatuArt, childWitchFrame } from './artwork.js';
+import { vampFrame, witchArt, nosferatuArt, childWitchFrame, catArt } from './artwork.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
 import { drawGround, drawBuilding, drawLamp, lampPositions , drawStreetPumpkin } from './scenery.js';
 
@@ -270,7 +270,13 @@ function drawCat(ctx, c, o, t) {
   const { oxf, oyf, z } = o;
   const sx = oxf + c.x * z, sy = oyf + c.y * z;
   shadow(ctx, sx, sy, z, 7, 0.28 * a);
-  drawSprite(ctx, catSprite(c.used ? '#6a6a72' : c.eye, PX * z), sx, sy, a);
+  const drawn = catArt(c.pose, c.step, c.faceLeft, PX * z);
+  drawSprite(ctx, drawn || catSprite(c.used ? '#6a6a72' : c.eye, PX * z), sx, sy, a);
+  // A cat you have already brushed against keeps its eyes and stops burning
+  // them at you.  The coded sprite says that by swapping the eye colour out;
+  // the drawing has its red painted in, so it says it the way the street says
+  // it - the colour drains and the animal stays exactly where it was.
+  if (drawn && c.used) drawSprite(ctx, greySprite(drawn), sx, sy, a);
 }
 
 // ---------------------------------------------------------------------------
