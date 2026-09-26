@@ -22,6 +22,19 @@ export function factText(key, party) {
   return '';
 }
 
+// What goes in a card's corner index.  The decoration's real wording is a
+// sentence and will not fit there, so it gets a token; everything else is
+// already short enough to print as it stands.
+const DECO_TOKEN = {
+  pumpkin: 'a pumpkin', cobweb: 'a cobweb', skeleton: 'a skeleton',
+  bats: 'paper bats', ghost: 'a ghost', none: 'nothing at all',
+};
+
+export function cardFact(key, party) {
+  if (key === 'deco') return DECO_TOKEN[party.deco.key] || party.deco.key;
+  return shortFact(key, party);
+}
+
 export function shortFact(key, party) {
   switch (key) {
     case 'district': return DISTRICTS[party.districtIdx].name;

@@ -41,13 +41,24 @@ export function newGame(seedStr) {
     seed: seedStr, rng, city, world, player,
     state: 'title',
     clock: { t: 0, minutes: 0 },
-    knowledge: {},
+    knowledge: {}, tipsTaken: 0,
     toasts: [], log: [],
     prompt: null, dialogue: null, target: null,
     vision: 0, visionMix: 0, bleed: 0, camShake: 0,
     endTitle: '', endText: '',
     stats: { knocks: 0, talks: 0, bats: 0 },
   };
+}
+
+/**
+ * Pull a buried tip up to the front of the deck.  Position in the pile is just
+ * the order the tips arrived in, so coming forward is simply becoming the
+ * newest thing you were told - no separate shuffle state to keep in step.
+ */
+export function bringTipForward(game, key) {
+  if (!game.knowledge[key]) return false;
+  game.knowledge[key] = ++game.tipsTaken;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -305,7 +316,9 @@ function talk(game, npc) {
     ? ['district', 'col', 'row', 'deco']
     : rng.shuffle(unknown.slice());
   const key = order.find(k => unknown.includes(k)) || unknown[0];
-  game.knowledge[key] = true;
+  // the value is the order it arrived in, so the deck can put the newest on
+  // top; every reader of `knowledge` only ever asks whether it is truthy
+  game.knowledge[key] = ++game.tipsTaken;
   npc.talked++;
   sfx.clue();
   game.log.push({ text: factText(key, city.party) });

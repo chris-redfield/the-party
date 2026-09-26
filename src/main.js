@@ -1,9 +1,9 @@
 import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS } from './config.js';
 import { makeInput } from './input.js';
-import { newGame, updateGame, knock } from './game.js';
+import { newGame, updateGame, knock, bringTipForward } from './game.js';
 import { FACT_KEYS } from './hints.js';
 import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
-import { drawHud, drawTitle, drawEnd } from './hud.js';
+import { drawHud, drawTitle, drawEnd, cardAt } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity } from './audio.js';
 
 const canvas = document.getElementById('game');
@@ -31,6 +31,34 @@ cam.x = game.player.x;
 cam.y = game.player.y;
 
 const input = makeInput(() => resumeAudio());
+
+// --- the deck is the one thing you point at -------------------------------
+// The canvas is letterboxed to whatever the window is, so a click has to be
+// put back into the 1280x720 the game actually draws in before it means
+// anything.
+function canvasPoint(e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (VIEW_W / r.width),
+    y: (e.clientY - r.top) * (VIEW_H / r.height),
+  };
+}
+
+function cardUnder(e) {
+  if (game.state !== 'play' || paused) return null;
+  const { x, y } = canvasPoint(e);
+  return cardAt(x, y, game.knowledge);
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const key = cardUnder(e);
+  if (key) { bringTipForward(game, key); e.preventDefault(); }
+});
+
+// so it is discoverable at all: buried cards say they can be picked up
+canvas.addEventListener('mousemove', (e) => {
+  canvas.style.cursor = cardUnder(e) ? 'pointer' : '';
+});
 
 function restart() {
   game = newGame(seedParam || undefined);
@@ -105,7 +133,7 @@ window.PARTY = {
     cam.x = game.player.x; cam.y = game.player.y;
   },
   reveal() {
-    for (const k of FACT_KEYS) game.knowledge[k] = true;
+    for (const k of FACT_KEYS) game.knowledge[k] = ++game.tipsTaken;
     game.knowledge.marked = true;
   },
   skipTo(min) { game.clock.t = min / 360 * 720; },

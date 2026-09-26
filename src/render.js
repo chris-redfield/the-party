@@ -1,7 +1,7 @@
 import {
   CELL, GRID, WORLD, ROAD, WALK, CORE0, CORE1, RING0, RING1, CROSS0, CROSS1,
   VIEW_W, VIEW_H, PX, RA, RB, BASS_RADIUS, LIGHTING, DAWN_TINT, COLOR_DOORS,
-  BUMP_ANIM, VISION_BLEED, VISION_STEPS,
+  BUMP_ANIM, VISION_BLEED, VISION_STEPS, BAT_POOF,
 } from './config.js';
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
@@ -635,6 +635,8 @@ export function drawScene(ctx, cam, game) {
   }
   for (const c of world.cats) if (inView(c)) list.push({ y: c.y, fn: () => drawCat(ctx, c, o, clock.t) });
   list.push({ y: player.y, fn: () => drawPlayer(ctx, player, o, clock.t) });
+  // the smoke sorts on the spot it was struck, not on wherever the bat is now
+  if (player.poof > 0) list.push({ y: player.poofY, fn: () => drawPoof(ctx, player, o) });
 
   list.sort((a, b) => a.y - b.y);
   for (const item of list) item.fn();
@@ -670,6 +672,53 @@ function drawCat(ctx, c, o, t) {
   const sx = ox + c.x * z, sy = oy + c.y * z;
   shadow(ctx, sx, sy, z, 7, 0.28 * a);
   drawSprite(ctx, catSprite(c.used ? '#6a6a72' : c.eye, PX * z), sx, sy, a);
+}
+
+// ---------------------------------------------------------------------------
+// The poof
+// ---------------------------------------------------------------------------
+// A vampire does not grow wings, it stops being there.  What is left on the
+// pavement for half a second is the shape he was standing in, coming apart:
+// puffs shoving outwards and upwards off the spot, thinning as they go.  It
+// is pinned to where the change happened rather than to the bat, which is
+// what makes the bat look like it came out of it.
+const POOF_SMOKE = ['#847c96', '#a79fba', '#cbc4da'];   // back to front
+const POOF_PUFFS = 11;
+
+function drawPoof(ctx, p, o) {
+  const { ox, oy, z } = o;
+  const u = Math.max(0, Math.min(1, 1 - p.poof / BAT_POOF));
+  // Still travelling when its time is up.  It does not ease to a halt, thin
+  // out or shrink away - all of those are fading by another name.  It is one
+  // solid thing that moves for a third of a second and is then not there,
+  // the way a sprite animation ends on its last frame.
+  const grow = Math.pow(u, 0.8);
+  const gx = ox + p.poofX * z, gy = oy + p.poofY * z;
+
+  // Not one transparent pixel in it.  Flat pixel art has no alpha anywhere
+  // else, and smoke you can see the kerb through reads as a bug rather than
+  // as smoke.
+  for (let layer = 0; layer < POOF_SMOKE.length; layer++) {
+    ctx.fillStyle = POOF_SMOKE[layer];
+    ctx.beginPath();
+    let drew = false;
+    for (let i = layer; i < POOF_PUFFS; i += POOF_SMOKE.length) {
+      const hash = Math.sin(i * 12.9898 + p.poofSeed) * 43758.5453;
+      const j = hash - Math.floor(hash);         // 0..1, steady for this puff
+      // every third puff hangs back near the middle so it does not read as a
+      // ring of identical blobs
+      const near = i % 3 === 0 ? 0.5 : 1;
+      const r = (4 + j * 3) * near * (1 + 0.25 * u);
+      const a = (i / POOF_PUFFS) * 6.2832 + p.poofSeed + grow * 0.5;
+      const d = grow * (11 + j * 7) * near;
+      const x = gx + Math.cos(a) * d * z;
+      const y = gy + Math.sin(a) * d * 0.45 * z - (4 + grow * 13) * near * z;
+      ctx.moveTo(x + r * z, y);
+      ctx.arc(x, y, r * z, 0, 6.2832);
+      drew = true;
+    }
+    if (drew) ctx.fill();   // one solid fill per tone - no stacking, no alpha
+  }
 }
 
 function drawPlayer(ctx, p, o, t) {

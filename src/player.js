@@ -1,5 +1,5 @@
 import {
-  WALK_SPEED, BAT_SPEED, BAT_TIME, BAT_MANA, BAT_BLOOD, MANA_MAX, BLOOD_MAX,
+  WALK_SPEED, BAT_SPEED, BAT_TIME, BAT_MANA, BAT_BLOOD, BAT_POOF, MANA_MAX, BLOOD_MAX,
   MANA_REGEN, CANDY_PER_FOLLOWER, MAX_FOLLOWERS, MIN_SPEED_MULT, FOLLOW_THRESHOLD,
   BUMP_ANIM,
 } from './config.js';
@@ -27,6 +27,7 @@ export function makePlayer(x, y) {
     x, y, dir: 'down', faceX: 0, faceY: 1,
     blood: BLOOD_MAX, mana: MANA_MAX, candy: 0,
     bat: 0, batX: 0, batY: 1, batCooldown: 0,
+    poof: 0, poofX: 0, poofY: 0, poofSeed: 0,
     anim: 0, frame: -1, moving: false,
     hurtFlash: 0, gainFlash: 0, followers: 0, stagger: 0,
     bumpT: 0, bumpX: 0, bumpY: 0,
@@ -53,6 +54,11 @@ export function tryBat(p, ix, iy) {
   p.batX = dx / len; p.batY = dy / len;
   p.bat = BAT_TIME;
   p.batCooldown = BAT_TIME + 0.18;
+  // the smoke is struck here, on the frame the change happens, and stays on
+  // this spot while the bat leaves it
+  p.poof = BAT_POOF;
+  p.poofX = p.x; p.poofY = p.y;
+  p.poofSeed = Math.random() * 6.2832;
   if (p.mana >= BAT_MANA) { p.mana -= BAT_MANA; return 'mana'; }
   p.mana = 0;
   p.blood -= BAT_BLOOD;
@@ -63,6 +69,7 @@ export function tryBat(p, ix, iy) {
 export function updatePlayer(p, dt, input) {
   if (!p.alive) return;
   if (p.batCooldown > 0) p.batCooldown -= dt;
+  if (p.poof > 0) p.poof -= dt;
   if (p.hurtFlash > 0) p.hurtFlash -= dt;
   if (p.stagger > 0) p.stagger -= dt;
   if (p.bumpT > 0) p.bumpT -= dt;

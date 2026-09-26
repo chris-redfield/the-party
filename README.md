@@ -32,6 +32,7 @@ Any static server works. Drop the folder on itch.io / GitHub Pages as-is.
 | `Q` | dump your candy on the pavement |
 | `ESC` / `P` | pause · hold `ESC` + `R` for a fresh night |
 | `M` | mute · `[` `]` zoom |
+| click a card | pull a buried tip back to the front of the deck |
 
 ## The rules underneath
 
@@ -42,6 +43,12 @@ one, chosen at random each night, is the party.
 
 **Bat form costs NIGHT** (the purple bar). When NIGHT runs dry the wings start
 billing you in BLOOD instead, which is the whole tragedy of the design.
+
+A vampire does not grow wings, he stops being there: the change is struck on
+the spot as a poof of smoke, which stays where it happened while the bat
+leaves it. There is not a transparent pixel in it, and it never fades, thins
+or shrinks away — it is solid, it is still moving, and then it is simply not
+there, the way a sprite animation ends on its last frame.
 
 **The street is children.** There are no adults out here at all — the grown-ups
 are all indoors, behind the hundred doors, handing out fun-size somethings.
@@ -68,10 +75,19 @@ nothing else to say. The only thing in this city that will tell you where the
 party is, is a monster — and see below.
 
 **Four facts pin down one door:** the district, the avenue, the street, and
-what is hanging beside the door. One door per block means district + avenue +
-street is already a full address; the decoration is how you recognise the place
-if you stumble on it before you know where you are. Every fact narrows the
-minimap, and when one block is left the map says so.
+what is hanging beside the door. Each one you are given is a playing card, and
+they stack up bottom left along the axis between you and the screen — newest
+lying face up on top, the ones underneath showing only their corner index, the
+way a deck does when it is not squared up. Until you have been given anything
+the deck is one card, face down. Click any card that is not already on top and
+it comes to the front, so you can read whichever one you need; and the deck
+stays up while a monster is talking to you, because that is the moment a card
+lands on it.
+
+One door per block means district + avenue + street is already a full address;
+the decoration is how you recognise the place if you stumble on it before you
+know where you are. Every fact narrows the minimap, and when one block is left
+the map says so.
 
 ### Vampire vision
 
@@ -157,7 +173,7 @@ has to have gone before a monster drops its costume — the picture and the `[E]
 prompt read the same number, so you can never talk to something that still
 looks like a child. `MONSTERS_PER_BLOCK` is how many of them are out there;
 `BUMP_BLOOD`, `BUMP_STAGGER`, `BUMP_ANIM` and `BUMP_SHAKE` tune what it feels
-like to be walked into.
+like to be walked into, and `BAT_POOF` is how long the smoke hangs about.
 
 ## Source layout
 
@@ -173,7 +189,7 @@ src/player.js       movement, bat form, the candy speed penalty
 src/hints.js        FACT_KEYS - the facts, and the dialogue around them
 src/game.js         state machine: clock, interactions, win and loss
 src/render.js       camera, city, and the ordinary / vampire-vision palettes
-src/hud.js          vitals, clock, minimap, clue panel, title and end cards
+src/hud.js          vitals, clock, minimap, the deck of tips, title and ends
 src/audio.js        procedural sound - no audio files
 src/sprites.js      PLACEHOLDER ART. self-contained on purpose.
 src/input.js

@@ -3,7 +3,7 @@ import {
   VISION_SECONDS, VISION_WARN,
 } from './config.js';
 import { DISTRICTS } from './city.js';
-import { shortFact, FACT_KEYS } from './hints.js';
+import { shortFact, cardFact, FACT_KEYS } from './hints.js';
 
 const FONT = (px, bold = true) =>
   `${bold ? 'bold ' : ''}${px}px "Courier New", ui-monospace, monospace`;
@@ -78,7 +78,11 @@ export function drawHud(ctx, game) {
 
   drawVision(ctx, game);
   drawMinimap(ctx, game);
-  if (!dialogue) drawClues(ctx, knowledge, city);
+  // The deck stays up while somebody is talking to you - that is the moment a
+  // card arrives, and watching it land is the point.  It clears the dialogue
+  // box on the left, which the old text panel did not, which is why that one
+  // had to be hidden.
+  drawClues(ctx, knowledge, city);
 
   // --- interaction prompt --------------------------------------------------
   if (prompt && !dialogue) {
@@ -152,26 +156,174 @@ function wrap(ctx, text, x, y, maxW, lh) {
 }
 
 // ---------------------------------------------------------------------------
-function drawClues(ctx, knowledge, city) {
-  const known = FACT_KEYS.filter(k => knowledge[k]);
-  const h = 46 + Math.max(known.length, 1) * 20;
-  panel(ctx, 16, VIEW_H - h - 16, 372, h);
+// ---------------------------------------------------------------------------
+// The tips, as a deck
+// ---------------------------------------------------------------------------
+// Every tip you get off a monster is a card, and they pile up along the axis
+// between you and the screen.  The newest lies face up at the front; the ones
+// underneath show only their corner index, the way a real deck does when it
+// is not squared up.  Four cards is the whole deck and the whole address.
+const CARD_W = 92, CARD_H = 129;       // the proportions of a playing card
+const CARD_DX = 12, CARD_DY = 22;      // how far each card underneath shows
+const CARD_STOCK = '#efe9e2';
+const CARD_EDGE = '#14121c';
+const SUITS = {
+  district: ['\u2660', '#1b1622'],
+  col: ['\u2666', '#b3122b'],
+  row: ['\u2663', '#1b1622'],
+  deco: ['\u2665', '#b3122b'],
+};
+const CARD_NAME = { district: 'DISTRICT', col: 'AVENUE', row: 'STREET', deco: 'THE DOOR' };
+
+function cardShape(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function wrapLines(ctx, text, maxW) {
+  const words = String(text).split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawCard(ctx, x, y, key, party, front) {
+  cardShape(ctx, x, y, CARD_W, CARD_H, 8);
+  ctx.fillStyle = CARD_STOCK;
+  ctx.fill();
+  ctx.strokeStyle = CARD_EDGE;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  const [pip, ink] = SUITS[key];
+  // The corner index is the only part of a buried card you can still read, so
+  // it carries the fact itself rather than a suit and a number.
   ctx.textAlign = 'left';
-  ctx.font = FONT(13);
-  ctx.fillStyle = '#c9a8ff';
-  ctx.fillText(`WHAT YOU KNOW  (${known.length}/${FACT_KEYS.length})`, 28, VIEW_H - h + 6);
-  ctx.font = FONT(14, false);
-  let y = VIEW_H - h + 30;
+  ctx.font = FONT(12);
+  ctx.fillStyle = ink;
+  ctx.fillText(pip, x + 8, y + 17);
+  const token = cardFact(key, party);
+  let size = 12;
+  while (size > 7) { ctx.font = FONT(size); if (ctx.measureText(token).width <= CARD_W - 34) break; size--; }
+  ctx.font = FONT(size);
+  ctx.fillStyle = '#2a2432';
+  ctx.fillText(token, x + 23, y + 17);
+  if (!front) return;
+
+  ctx.textAlign = 'center';
+  ctx.font = FONT(30);
+  ctx.fillStyle = ink;
+  ctx.fillText(pip, x + CARD_W / 2, y + 68);
+
+  // the face carries the full wording, shrunk until it sits on the card
+  const text = shortFact(key, party);
+  let fs = 13, lines = [];
+  for (const s of [13, 12, 11, 10, 9, 8]) {
+    fs = s; ctx.font = FONT(s);
+    lines = wrapLines(ctx, text, CARD_W - 16);
+    if (lines.length <= 2) break;
+  }
+  ctx.font = FONT(fs);
+  ctx.fillStyle = '#1b1622';
+  const lh = fs + 2;
+  lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, x + CARD_W / 2, y + 90 + i * lh));
+
+  ctx.font = FONT(9);
+  ctx.fillStyle = '#6a6478';
+  ctx.fillText(CARD_NAME[key], x + CARD_W / 2, y + CARD_H - 9);
+}
+
+/** Face down: the tips you have not been given yet. */
+function drawCardBack(ctx, x, y) {
+  cardShape(ctx, x, y, CARD_W, CARD_H, 8);
+  ctx.fillStyle = '#241a34';
+  ctx.fill();
+  ctx.strokeStyle = CARD_EDGE;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.save();
+  cardShape(ctx, x + 6, y + 6, CARD_W - 12, CARD_H - 12, 5);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(160,120,220,0.30)';
+  ctx.lineWidth = 2;
+  for (let d = -CARD_H; d < CARD_W + CARD_H; d += 10) {
+    ctx.beginPath();
+    ctx.moveTo(x + d, y);
+    ctx.lineTo(x + d - CARD_H, y + CARD_H);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.font = FONT(30);
+  ctx.fillStyle = '#7a6a9c';
+  ctx.fillText('?', x + CARD_W / 2, y + CARD_H / 2 + 11);
+}
+
+// Newest first, so index 0 is the card lying on top of the pile.  Drawing and
+// hit-testing both go through these two, because a deck you cannot click
+// accurately is worse than one you cannot click at all.
+function deckOrder(knowledge) {
+  return FACT_KEYS.filter(k => knowledge[k]).sort((a, b) => knowledge[b] - knowledge[a]);
+}
+
+function cardPos(i) {
+  return { x: 16 + i * CARD_DX, y: VIEW_H - 34 - CARD_H - i * CARD_DY };
+}
+
+/**
+ * Which card is under this point, front first - or null for empty pavement
+ * and for the card already on top, which has nowhere to come forward to.
+ */
+export function cardAt(px, py, knowledge) {
+  const known = deckOrder(knowledge);
+  for (let i = 0; i < known.length; i++) {
+    const { x, y } = cardPos(i);
+    if (px >= x && px <= x + CARD_W && py >= y && py <= y + CARD_H) {
+      return i === 0 ? null : known[i];
+    }
+  }
+  return null;
+}
+
+function drawClues(ctx, knowledge, city) {
+  const known = deckOrder(knowledge);
+  const { x: x0, y: y0 } = cardPos(0);
+
   if (!known.length) {
+    drawCardBack(ctx, x0, y0);
+    ctx.textAlign = 'left';
+    ctx.font = FONT(13);
     ctx.fillStyle = '#7a7288';
-    ctx.fillText('nothing. find a cat, find a monster.', 28, y);
-    y += 20;
+    ctx.fillText('nothing yet.', x0 + CARD_W + 14, y0 + 64);
+    ctx.fillText('find a cat,', x0 + CARD_W + 14, y0 + 84);
+    ctx.fillText('find a monster.', x0 + CARD_W + 14, y0 + 104);
+  } else {
+    // back to front: each card has to land on top of the one behind it
+    for (let i = known.length - 1; i >= 0; i--) {
+      const { x, y } = cardPos(i);
+      drawCard(ctx, x, y, known[i], city.party, i === 0);
+    }
   }
-  for (const k of known) {
-    ctx.fillStyle = '#e8dcff';
-    ctx.fillText('* ' + shortFact(k, city.party), 28, y);
-    y += 20;
-  }
+
+  ctx.textAlign = 'left';
+  ctx.font = FONT(12);
+  ctx.fillStyle = known.length === FACT_KEYS.length ? '#7aff9a' : '#c9a8ff';
+  ctx.fillText(`WHAT YOU KNOW  ${known.length}/${FACT_KEYS.length}`, x0, VIEW_H - 14);
 }
 
 // ---------------------------------------------------------------------------

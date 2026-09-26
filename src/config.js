@@ -89,6 +89,7 @@ export const WALK_SPEED = 132;             // world px / sec
 export const BAT_SPEED = 300;
 export const BAT_TIME = 0.55;              // seconds airborne
 export const BAT_MANA = 25;
+export const BAT_POOF = 0.35;              // how long the smoke hangs about
 export const BAT_BLOOD = 14;               // paid instead when mana is short
 export const MANA_REGEN = 7.5;             // per second
 export const BLOOD_DRAIN = 5 / 60;         // per second (~1.8 per game-hour)
