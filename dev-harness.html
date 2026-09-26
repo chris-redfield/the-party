@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="css/style.css"></head>
+<body><div id="frame"><canvas id="game"></canvas></div>
+<pre id="err" style="position:fixed;top:0;left:0;color:#f66;font:12px monospace;background:#000c;z-index:9;max-width:100%;white-space:pre-wrap"></pre>
+<script>
+// headless chrome starves rAF under --virtual-time-budget; drive it from timers
+window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+const errs=[];
+function show(m){errs.push(m);document.getElementById('err').textContent=errs.slice(0,12).join('\n');}
+window.addEventListener('error',e=>show('ERR: '+(e.message||e.error)+' @'+e.filename+':'+e.lineno));
+window.addEventListener('unhandledrejection',e=>show('REJ: '+e.reason));
+const oe=console.error; console.error=(...a)=>{show('CONSOLE: '+a.join(' '));oe(...a);};
+</script>
+<script type="module" src="src/main.js"></script>
+<script>
+function key(code,type){window.dispatchEvent(new KeyboardEvent(type,{code,bubbles:true}));}
+function tap(code,ms=60){key(code,'keydown');setTimeout(()=>key(code,'keyup'),ms);}
+const script=JSON.parse(new URLSearchParams(location.search).get('s')||'[]');
+let t=200;
+for(const step of script){ setTimeout(()=>{ if(step[1]==='hold'){key(step[0],'keydown');} else if(step[1]==='release'){key(step[0],'keyup');} else tap(step[0]); }, t); t+=step[2]||300; }
+</script>
+</body></html>
+<script>
+// optional post-load hook, e.g. ?hook=PARTY.warp()
+const hook=new URLSearchParams(location.search).get('hook');
+if(hook) setTimeout(()=>{ try{ eval(hook); }catch(e){ show('HOOK: '+e.message); } }, 800);
+if(new URLSearchParams(location.search).get('probe')){
+  const d=document.createElement('pre');
+  d.style.cssText='position:fixed;bottom:0;left:0;color:#8f8;font:11px monospace;background:#000c;z-index:99;white-space:pre-wrap';
+  document.body.appendChild(d);
+  const hist=[];
+  setInterval(()=>{ try{
+    const g=window.PARTY&&window.PARTY.game;
+    hist.push(Math.round(performance.now())+' st='+(g?g.state:'-')+' min='+(g?g.clock.minutes.toFixed(1):'-')+' f='+window.__frames);
+    d.textContent=hist.slice(-14).join('\n');
+  }catch(e){ d.textContent+='\nPROBE '+e.message; } }, 250);
+}
+</script>
