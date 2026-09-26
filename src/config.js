@@ -206,6 +206,15 @@ export const CAT_RISE = [1.0, 1.5];        // seconds up before it moves
 // does not moonwalk.
 export const CAT_STRIDE = 7;
 
+// --- the shadow beasts -------------------------------------------------------
+// One for every trick-or-treater, and you never see them unless a cat has lent
+// you its eyes.  They keep station on their child rather than walking, so the
+// only number they need is the distance at which keeping station gives way to
+// simply being there - past this it has been out of the simulation and is
+// catching up from wherever it was left, which must not be a flight down the
+// street.
+export const BEAST_SNAP = 90;
+
 // --- pumpkins in the way -----------------------------------------------------
 // Somebody has left them out on the pavement and on the crossings.  They are
 // about as big as a trick-or-treater and they are solid, but they never take

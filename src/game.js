@@ -6,7 +6,7 @@ import {
 } from './config.js';
 import { makeRng, hashSeed } from './rng.js';
 import { buildCity, ringPoint, nearestRingT, blockAt, isWalkable } from './city.js';
-import { populate, updateKid, updateCat } from './entities.js';
+import { populate, updateKid, updateCat, updateBeast } from './entities.js';
 import { makePlayer, updatePlayer, tryBat, wantedFollowers, shove } from './player.js';
 import {
   FACT_KEYS, makeTip, tipLine, exhaustedLine, fullLine, catLine, factText,
@@ -231,6 +231,14 @@ export function updateGame(game, dt, input) {
     // by blundering into a cat the vision has taken off the street.
     if (!c.used && game.visionMix < REVEAL
         && Math.hypot(c.x - p.x, c.y - p.y) < CAT_TOUCH) lendVision(game, c);
+  }
+
+  // The beasts keep station on the children, whether or not you can see them -
+  // one that only moved while you were looking would be somewhere else every
+  // time the vision came up.
+  for (const b of world.beasts) {
+    if (Math.abs(b.host.x - p.x) + Math.abs(b.host.y - p.y) > SIM_RADIUS) continue;
+    updateBeast(b, dt);
   }
 
   manageFollowers(game);

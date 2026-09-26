@@ -291,6 +291,19 @@ the city is done talking to you.
 
 Every cat carries the same thing and gives it once.
 
+**And the street turns out to have been crowded.** There is a shadow beast for
+every single trick-or-treater in the city — over a thousand of them — and you
+never see one without a cat's eyes. Each keeps station on its own child: off to
+one side, a little behind, always closing the gap rather than welded to it,
+and off the ground, so it lays nothing on the pavement. They do not walk,
+because they do not touch anything: nothing collides with them, nothing knows
+they are there, and no pavement test is ever run on them. Their child is the
+thing that knows about pavements, and they go where it goes.
+
+They arrive on the same beat the costumes come off on, which is the point of
+them — the street does not slowly fill up with them, it turns out to have been
+full the whole time you were walking down it.
+
 **It does not switch off, it wears off.** The last 30% of it is spent
 bleeding back out — the colour creeping in, the torches guttering, the crosses
 sinking back into ordinary road paint, the monsters settling back into the
@@ -482,7 +495,8 @@ src/rng.js          seeded PRNG - one seed reproduces a whole city
 src/city.js         the cut: BSP into blocks, blocks into buildings, plus
                     walkability, crossings, junctions, doors and districts
 src/entities.js     spawning and behaviour for kids / monsters / cats.
-                    a monster carries two looks: `disguise` and `spec`
+                    a monster carries two looks: `disguise` and `spec`,
+                    and every child carries a shadow beast
 src/player.js       movement, bat form, the candy speed penalty
 src/hints.js        FACT_KEYS - the facts, and the dialogue around them
 src/game.js         state machine: clock, interactions, win and loss
@@ -501,6 +515,20 @@ src/artwork.js      the ones who are not: the vampire, the witches, the
 src/input.js
 src/main.js         loop and wiring
 ```
+
+The shadow beasts are `assets/party-shadow beasts-01.png`, and that sheet is
+the one that is **not on a grid**: it is four different animals at four
+different sizes, so `cutBands()` finds them by looking for the rows of the
+image that have nothing in them at all and treats each run of rows that does
+as one drawing. Add a fifth to the sheet and a fifth beast walks the street
+without a line of code changing; the one rule is a clear row between two of
+them, since two that touch are one beast as far as that is concerned. They
+keep their sizes against each other — `BEAST_BOX` is the tallest of them at 30
+art pixels, just under the vampire, which leaves the small ones at about a
+child's shoulder. They face left, like the cat, and the mirror is the one
+heading right. There is no coded stand-in for a beast: it is the drawing or it
+is nothing, which is the right answer for a thing you can only see through a
+cat's eyes.
 
 The cat is `assets/party-cat-01.png`, four drawings in a column: sitting,
 standing, and two of the walk. It is the one drawing here that is deliberately

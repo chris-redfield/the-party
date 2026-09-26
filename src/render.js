@@ -5,7 +5,7 @@ import {
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
-import { vampFrame, witchArt, nosferatuArt, childWitchFrame, catArt } from './artwork.js';
+import { vampFrame, witchArt, nosferatuArt, childWitchFrame, catArt, beastArt } from './artwork.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
 import { drawGround, drawBuilding, drawLamp, lampPositions , drawStreetPumpkin } from './scenery.js';
 
@@ -237,6 +237,13 @@ export function drawScene(ctx, cam, game) {
     if (inView(n)) list.push({ y: n.y, fn: () => drawNpc(ctx, n, o, clock.t) });
   }
   for (const c of world.cats) if (inView(c)) list.push({ y: c.y, fn: () => drawCat(ctx, c, o, clock.t) });
+  // Out of the vision there is nothing to draw and nothing to sort: the whole
+  // crowd of them costs the frame nothing at all until the street turns.
+  if (swapAt(MIX.vision) > 0.02) {
+    for (const b of world.beasts) {
+      if (inView(b)) list.push({ y: b.y, fn: () => drawBeast(ctx, b, o, clock.t) });
+    }
+  }
   // a pumpkin sorts by where it stands, so a child behind one is behind it
   for (const pk of world.pumpkins) {
     if (inView(pk)) list.push({ y: pk.y, fn: () => drawStreetPumpkin(ctx, pk.x, pk.y, o, pk.seed) });
@@ -277,6 +284,22 @@ function drawCat(ctx, c, o, t) {
   // the drawing has its red painted in, so it says it the way the street says
   // it - the colour drains and the animal stays exactly where it was.
   if (drawn && c.used) drawSprite(ctx, greySprite(drawn), sx, sy, a);
+}
+
+// The other half of the street.  A shadow beast is the exact opposite of a cat
+// here: the cat is a thing of ordinary sight and goes as the vision comes, and
+// the beast is only ever there once the vision has arrived.  It comes in on
+// the same beat the costumes come off on - the street does not fill up
+// gradually, it turns out to have been full - and like everything that has
+// stopped pretending to be a child, it is off the ground and throws nothing on
+// to the pavement.
+function drawBeast(ctx, b, o, t) {
+  const a = swapAt(MIX.vision);
+  if (a <= 0.02) return;
+  const cv = beastArt(b.seed, b.faceLeft, PX * o.z);
+  if (!cv) return;               // they are the drawing or they are nothing
+  const lift = 5 + Math.sin(t * 1.6 + b.bob) * 3;
+  drawSprite(ctx, cv, o.oxf + b.x * o.z, o.oyf + (b.y - lift) * o.z, a);
 }
 
 // ---------------------------------------------------------------------------

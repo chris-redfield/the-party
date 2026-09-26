@@ -45,6 +45,13 @@ const CHILD_WITCH_SHEET = 'assets/party-child-001.png';
 // the mirrored one.
 const CAT_SHEET = 'assets/party-cat-01.png';
 
+// And the things that follow the children about.  Four of them, one under the
+// other, and they are the one sheet in here that is not on a grid: they are
+// different animals at different sizes, so the cells are found by looking for
+// the empty rows between them rather than by dividing the sheet up.  They face
+// left like the cat.
+const BEAST_SHEET = 'assets/party-shadow%20beasts-01.png';
+
 // How tall he stands, in the same art pixels everybody else is measured in.
 // The trick-or-treaters are 28 and he is a little over them - he is the one
 // adult out here, and the cape needs the room.
@@ -78,6 +85,12 @@ export const CHILD_WITCH_BOX = 24;
 // thing on the sheet, which leaves it sitting a little lower than it stands,
 // as a cat does.
 export const CAT_BOX = 12 * 1.4;
+// The tallest beast on the sheet, and the rest keep their size against it -
+// the sheet is drawn with a big one and three smaller ones and that is worth
+// keeping.  At 30 the tall one stands just under the vampire and the little
+// ones come up to a child's shoulder, which is the height at which a thing
+// following a child looks like it is following the child.
+export const BEAST_BOX = 30;
 
 // A pixel this close to white, reachable from outside the drawing, is
 // background.  The scan is generous because the sheet has soft edges.
@@ -99,6 +112,7 @@ export async function loadArtwork() {
     sheet('nosferatu', NOSFERATU_SHEET, 1, 1),
     sheet('childWitch', CHILD_WITCH_SHEET, 1, 3),
     sheet('cat', CAT_SHEET, 1, 4),
+    sheet('beast', BEAST_SHEET),          // no grid: cut at the empty rows
   ]);
 }
 
@@ -110,7 +124,7 @@ async function sheet(name, url, cols, rows) {
       img.onerror = () => rej(new Error(`${url} did not load`));
       img.src = url;
     });
-    sheets[name] = cut(img, cols, rows);
+    sheets[name] = cols ? cut(img, cols, rows) : cutBands(img);
   } catch (e) {
     console.warn(`artwork: ${e.message} - falling back to the drawn sprite`);
   }
@@ -124,18 +138,61 @@ export const catArtReady = () => !!sheets.cat;
 
 function cut(img, COLS, ROWS) {
   const cw = Math.floor(img.width / COLS), ch = Math.floor(img.height / ROWS);
+  const rects = [];
+  for (let r = 0; r < ROWS; r++) {
+    rects[r] = [];
+    for (let c = 0; c < COLS; c++) rects[r][c] = { x: c * cw, y: r * ch, w: cw, h: ch };
+  }
+  return cutRects(img, rects);
+}
+
+/**
+ * For a sheet that is not on a grid.  The drawings are found by looking for
+ * the rows of the image that have nothing in them at all, and each run of
+ * rows that does have something is one cell - so the drawings may be any size
+ * and sit anywhere across the width, which is how a sheet of four different
+ * animals comes out of a drawing program.
+ *
+ * The one rule it imposes is the obvious one: **one clear row between two
+ * drawings.**  Two that touch, even by a pixel, are one beast as far as this
+ * is concerned.
+ */
+function cutBands(img) {
+  const cv = document.createElement('canvas');
+  cv.width = img.width; cv.height = img.height;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const d = ctx.getImageData(0, 0, img.width, img.height).data;
+
+  const rects = [];
+  let start = -1;
+  for (let y = 0; y <= img.height; y++) {
+    let ink = false;
+    for (let x = 0; x < img.width && y < img.height; x++) {
+      const o = (y * img.width + x) * 4;
+      if (d[o + 3] >= 24 && !(d[o] >= WHITE && d[o + 1] >= WHITE && d[o + 2] >= WHITE)) {
+        ink = true; break;
+      }
+    }
+    if (ink && start < 0) start = y;
+    else if (!ink && start >= 0) { rects.push([{ x: 0, y: start, w: img.width, h: y - start }]); start = -1; }
+  }
+  return cutRects(img, rects);
+}
+
+function cutRects(img, rects) {
   const work = document.createElement('canvas');
-  work.width = cw; work.height = ch;
   const wctx = work.getContext('2d', { willReadFrequently: true });
 
   const grid = [];
   let tallest = 1;
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < rects.length; r++) {
     grid[r] = [];
-    for (let c = 0; c < COLS; c++) {
-      wctx.clearRect(0, 0, cw, ch);
-      wctx.drawImage(img, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
-      const cell = keyAndTrim(wctx, cw, ch);
+    for (let c = 0; c < rects[r].length; c++) {
+      const q = rects[r][c];
+      work.width = q.w; work.height = q.h;          // resizing is what clears it
+      wctx.drawImage(img, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
+      const cell = keyAndTrim(wctx, q.w, q.h);
       grid[r][c] = cell;
       if (cell && cell.h > tallest) tallest = cell.h;
     }
@@ -284,6 +341,25 @@ export function catArt(pose, step, faceLeft, scale) {
   const cell = sh.grid[row][0];
   if (!cell) return null;
   return scaled(`cat|${row}`, cell, sh, CAT_BOX, !faceLeft, scale);
+}
+
+/**
+ * One of the beasts.  `seed` is the animal - taken modulo however many
+ * drawings the sheet turned out to hold, so adding a fifth to the sheet puts
+ * a fifth beast on the street and nothing here has to change - and they are
+ * drawn facing left, so the mirror is the one heading right.
+ *
+ * There is no coded stand-in for these: they are the drawing or they are not
+ * there at all, which is the right answer for something you can only see
+ * through a cat's eyes anyway.
+ */
+export function beastArt(seed, faceLeft, scale) {
+  const sh = sheets.beast;
+  if (!sh) return null;
+  const row = ((seed % sh.grid.length) + sh.grid.length) % sh.grid.length;
+  const cell = sh.grid[row][0];
+  if (!cell) return null;
+  return scaled(`beast|${row}`, cell, sh, BEAST_BOX, !faceLeft, scale);
 }
 
 function still(name, box, scale) {

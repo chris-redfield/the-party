@@ -1,5 +1,6 @@
 import {
   KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, CAT_RISE, CAT_STRIDE, LIAR_CHANCE,
+  BEAST_SNAP,
   PUMPKINS_PER_BLOCK, PUMPKIN_CROSSING_CHANCE, PUMPKIN_R, PUMPKIN_BLOCK,
   PUMPKIN_LAT, PUMPKIN_CROSS_LAT,
 } from './config.js';
@@ -82,7 +83,7 @@ export function realWitchSpec(rng) {
 // Spawning
 // ---------------------------------------------------------------------------
 export function populate(rng, city) {
-  const kids = [], npcs = [], cats = [], pumpkins = [];
+  const kids = [], npcs = [], cats = [], pumpkins = [], beasts = [];
 
   for (const block of city.blocks) {
     const perim = block.perim;
@@ -195,7 +196,28 @@ export function populate(rng, city) {
                     seed: rng.int(0, 1e9) });
   }
 
-  return { kids, npcs, cats, pumpkins };
+  // ---------------------------------------------------------------------
+  // The shadow beasts.  One for every child in the city, which is what makes
+  // the street in vampire vision twice as full as the street you have been
+  // walking down all night: every one of them has had something at its
+  // shoulder the whole time.
+  //
+  // They are not spawned onto the pavement, they are spawned onto a child -
+  // the pavement is wherever their child is, and a child is only ever on one.
+  // Nothing collides with them and nothing knows they are there.
+  for (const k of kids) {
+    beasts.push({
+      kind: 'beast', host: k, seed: rng.int(0, 1e9),
+      // where it hangs: off to one side and a little behind, its own distance
+      side: rng.chance(0.5) ? 1 : -1,
+      lag: rng.range(9, 20), back: rng.range(-3, 5),
+      ease: rng.range(2.2, 4.4),        // how quickly it closes that gap
+      bob: rng.range(0, 6.28), faceLeft: rng.chance(0.5),
+      x: k.x, y: k.y,
+    });
+  }
+
+  return { kids, npcs, cats, pumpkins, beasts };
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +263,31 @@ export function updateKid(k, dt, player) {
  * other.  On the sides where it is walking straight up or down the screen
  * there is nothing to take, so it keeps whichever way it last faced.
  */
+/**
+ * A beast keeps station on its child: off to one side, a little behind, and
+ * always arriving rather than arrived - the easing is what makes it drag
+ * after a child who breaks into a walk instead of being welded to it.  It has
+ * no walk of its own, and does not need one: it does not touch the ground.
+ *
+ * Nothing here is collision, and nothing here is on a pavement test.  It goes
+ * where its child goes, and its child is the thing that knows about pavements.
+ */
+export function updateBeast(b, dt) {
+  const h = b.host;
+  const tx = h.x + b.side * b.lag, ty = h.y + b.back;
+  // Far away from where it should be - because the city stopped simulating it
+  // while you were three blocks away - it is simply there.  Easing across half
+  // a city would read as a thing flying at you down the street.
+  if (Math.hypot(tx - b.x, ty - b.y) > BEAST_SNAP) { b.x = tx; b.y = ty; return; }
+  const k = 1 - Math.exp(-b.ease * dt);      // same closing rate at any framerate
+  const x0 = b.x;
+  b.x += (tx - b.x) * k;
+  b.y += (ty - b.y) * k;
+  // it turns to face the way it is travelling, and keeps facing that way when
+  // it stops - a beast that snaps back to a default facing at rest twitches
+  if (Math.abs(b.x - x0) > 0.05) b.faceLeft = b.x < x0;
+}
+
 export function updateCat(c, dt) {
   if (c.pause > 0) {                         // sitting down
     c.pose = 'sit';
