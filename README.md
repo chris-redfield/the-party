@@ -495,8 +495,9 @@ src/hourglass.js    the clock, which is a moon being ground into a sun
 src/audio.js        procedural sound, and the one recorded thing there is:
                     the soundtrack in assets/ost, streamed and looped
 src/sprites.js      PLACEHOLDER ART for everybody drawn out of code.
-src/artwork.js      the ones who are not: the vampire, the witches and the
-                    nosferatu, cut out of real drawings in assets/
+src/artwork.js      the ones who are not: the vampire, the witches, the
+                    nosferatu and the child in the witch costume, cut out
+                    of real drawings in assets/
 src/input.js
 src/main.js         loop and wiring
 ```
@@ -507,10 +508,11 @@ replace `personSprite`, `catSprite` and `batSprite` with something that returns
 a canvas or image with `anchorX` / `anchorY` set to the sprite's feet, and
 nothing else has to change.
 
-**Three characters are the exception and are not drawn out of code**: the
-vampire you play, and the two monsters you find standing on the pavement — the
-witch and the nosferatu. They are real drawings, and `src/artwork.js` cuts
-them out of their sheets and puts them on screen.
+**Four characters are the exception and are not drawn out of code**: the
+vampire you play, the two monsters you find standing on the pavement — the
+witch and the nosferatu — and one of the trick-or-treaters, the child in the
+witch costume. They are real drawings, and `src/artwork.js` cuts them out of
+their sheets and puts them on screen.
 
 The vampire is `assets/vamp-frente e verso-01.png`, a sheet of eight: column 0
 is his back, column 1 his front, row 0 standing still and rows 1–3 the walk.
@@ -538,6 +540,25 @@ shoulders and nothing else. Neither is ever seen outside vampire vision: out
 of it they are wearing a child's costume like every other monster, and that
 costume is still built out of code. They keep their colour when the street
 drains, the way every monster does.
+
+The child in the witch costume is `assets/party-child-001.png`, a column of
+three drawings. **The whole sheet is her walk** — there is no fourth cell for
+standing still, because the middle drawing stands square enough on both feet
+to be her idle as well, and that is the one she holds when she stops.
+`CHILD_WITCH_BOX` is 24 art pixels, which is not a judgement call: it is what
+the coded kid she replaces already measures from the tip of her hat to her
+shoes, so the swap changes who she is and not how big she is. She is the only
+costume in the crowd that is a drawing, and a monster *wearing* that costume
+gets the drawing too — the disguise has to be the same child as the child
+standing next to it, or the disguise is the tell.
+
+Her walk runs off the child's own animation clock rather than off the `frame`
+number the coded sprite takes, since that frame only ever counts 0, 1 — it was
+written for a two-pose walk and would cost her the third drawing. It steps at
+the same six beats a second `updateKid()` drives the coded walk at, so a
+street of children still steps together. Like every child out there she is
+only ever drawn facing you: the kids walk a block's ring rather than a
+compass, and nothing in the crowd has a back.
 
 Two things about the sheet decide how that file works. Its background is white
 **and so is his face**, so keying white out would punch a hole through his

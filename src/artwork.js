@@ -2,9 +2,9 @@
 // THE DRAWINGS
 // ---------------------------------------------------------------------------
 // Most of this city is drawn out of code (src/sprites.js).  The characters who
-// are not - the vampire you play, and the witches and the nosferatu you find
-// standing on the pavement - are this file, which puts their artwork on the
-// screen.
+// are not - the vampire you play, the witches and the nosferatu you find
+// standing on the pavement, and the child in the witch costume - are this
+// file, which puts their artwork on the screen.
 //
 // `assets/vamp-frente e verso-01.png` is a sheet of eight, two columns by four
 // rows.  Column 0 is his back, column 1 is his front; row 0 is standing still
@@ -34,6 +34,12 @@ const VAMP_COLS = 2, VAMP_ROWS = 4;
 const WITCH_SHEET = 'assets/party-witch-01.png';
 const NOSFERATU_SHEET = 'assets/party-nosferatu-01.png';
 
+// One of the children is a drawing as well.  `assets/party-child-001.png` is
+// a column of three: the whole sheet is her walk, and the middle drawing
+// stands square enough on both feet to be her idle too, so there is no fourth
+// cell for standing still.
+const CHILD_WITCH_SHEET = 'assets/party-child-001.png';
+
 // How tall he stands, in the same art pixels everybody else is measured in.
 // The trick-or-treaters are 28 and he is a little over them - he is the one
 // adult out here, and the cape needs the room.
@@ -52,6 +58,13 @@ export const WITCH_BOX = VAMP_BOX * 1.2;
 // the vampire you play, which is what makes him read as one of your own kind
 // rather than as one of hers.
 export const NOSFERATU_BOX = VAMP_BOX;
+// The child in the witch costume is the one size in here that is not a
+// judgement call: it is what the coded kid she replaces already measures on
+// the pavement, 16 x 24 art pixels from the tip of the hat to her shoes.  The
+// drawing takes her height so that swapping her over changes who she is and
+// not how big she is - a child who grew when the art landed would move every
+// crowd she stands in.
+export const CHILD_WITCH_BOX = 24;
 
 // A pixel this close to white, reachable from outside the drawing, is
 // background.  The scan is generous because the sheet has soft edges.
@@ -71,6 +84,7 @@ export async function loadArtwork() {
     sheet('vamp', VAMP_SHEET, VAMP_COLS, VAMP_ROWS),
     sheet('witch', WITCH_SHEET, 1, 1),
     sheet('nosferatu', NOSFERATU_SHEET, 1, 1),
+    sheet('childWitch', CHILD_WITCH_SHEET, 1, 3),
   ]);
 }
 
@@ -91,6 +105,7 @@ async function sheet(name, url, cols, rows) {
 export const vampArtReady = () => !!sheets.vamp;
 export const witchArtReady = () => !!sheets.witch;
 export const nosferatuArtReady = () => !!sheets.nosferatu;
+export const childWitchArtReady = () => !!sheets.childWitch;
 
 function cut(img, COLS, ROWS) {
   const cw = Math.floor(img.width / COLS), ch = Math.floor(img.height / ROWS);
@@ -219,6 +234,26 @@ export function witchArt(scale) { return still('witch', WITCH_BOX, scale); }
 
 /** The other monster on the pavement, drawn the same way and just as still. */
 export function nosferatuArt(scale) { return still('nosferatu', NOSFERATU_BOX, scale); }
+
+// Her walk is the sheet, top to bottom, and the middle drawing doubles as the
+// idle.  It is driven off the child's own animation clock rather than off the
+// `frame` the coded sprite uses, because that frame only ever counts 0, 1 -
+// it was written for a two-pose walk - and reading it would cost her the
+// third drawing.  Same cadence the coded walk runs at, so a street of children
+// still steps together.
+const CHILD_WALK = [0, 1, 2];
+const CHILD_IDLE = 1;
+const CHILD_RATE = 6;                   // beats a second, as in updateKid()
+
+export function childWitchFrame(frame, anim, scale) {
+  const sh = sheets.childWitch;
+  if (!sh) return null;
+  const row = frame < 0 ? CHILD_IDLE
+    : CHILD_WALK[Math.floor((anim || 0) * CHILD_RATE) % CHILD_WALK.length];
+  const cell = sh.grid[row][0];
+  if (!cell) return null;
+  return scaled(`childWitch|${row}`, cell, sh, CHILD_WITCH_BOX, false, scale);
+}
 
 function still(name, box, scale) {
   const sh = sheets[name];

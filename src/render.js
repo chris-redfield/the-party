@@ -5,7 +5,7 @@ import {
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
-import { vampFrame, witchArt, nosferatuArt } from './artwork.js';
+import { vampFrame, witchArt, nosferatuArt, childWitchFrame } from './artwork.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
 import { drawGround, drawBuilding, drawLamp, lampPositions , drawStreetPumpkin } from './scenery.js';
 
@@ -123,6 +123,16 @@ function drawSprite(ctx, cv, sx, sy, alpha) {
 // silhouettes does not read as a disguise coming off, it reads as a bug.
 function swapAt(mix) { return Math.max(0, Math.min(1, (mix - 0.3) / 0.4)); }
 
+// One costume in the crowd is a drawing rather than a grid of colours - the
+// witch.  It goes through here so that a monster wearing that costume gets the
+// drawing too: the disguise has to be the same child as the child standing
+// next to it, or the disguise is the tell.  Everybody else, and the witch
+// child herself until her sheet lands, is built out of code as before.
+function childSprite(spec, dir, frame, anim, scale) {
+  return (spec.costume === 'witch' && childWitchFrame(frame, anim, scale))
+    || personSprite(spec, dir, frame, scale);
+}
+
 function drawPerson(ctx, e, o, t) {
   const { oxf, oyf, z } = o;
   const gx = oxf + e.x * z, gy = oyf + e.y * z;      // where the feet actually are
@@ -138,7 +148,7 @@ function drawPerson(ctx, e, o, t) {
     // real monsters cast no shadow. that is the tell, once you can see them.
     if (swap < 1) shadow(ctx, gx, gy, z, 9, 0.35 * (1 - swap));
     if (swap < 1) {
-      const kid = personSprite(e.disguise, dir, frame, scale);
+      const kid = childSprite(e.disguise, dir, frame, e.anim, scale);
       drawSprite(ctx, kid, gx, sy, 1);
       drawSprite(ctx, greySprite(kid), gx, sy, MIX.vision);   // drains like any child
     }
@@ -151,7 +161,7 @@ function drawPerson(ctx, e, o, t) {
     }
   } else {
     shadow(ctx, gx, gy, z, 9);
-    const cv = personSprite(e.spec, dir, frame, scale);
+    const cv = childSprite(e.spec, dir, frame, e.anim, scale);
     drawSprite(ctx, cv, gx, gy, 1);
     // the living go black and white. only the monsters keep their colour.
     if (MIX.vision > 0) drawSprite(ctx, greySprite(cv), gx, gy, MIX.vision);
