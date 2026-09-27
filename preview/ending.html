@@ -1,0 +1,146 @@
+<!doctype html><html><head><meta charset="utf-8"><title>the ending, as the game draws it</title>
+<style>
+ :root{--ink:#8a8a96}
+ body{margin:0;background:#0a0a0c;color:var(--ink);font:13px ui-monospace,monospace;
+      display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px}
+ canvas{image-rendering:pixelated;width:1280px;max-width:98vw;border:1px solid #222;background:#000}
+ .row{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:1280px}
+ b{color:#cf1206}
+ button{background:#16161c;color:#c8c8d2;border:1px solid #33333d;padding:4px 9px;
+        font:12px ui-monospace,monospace;cursor:pointer;border-radius:3px}
+ button.on{background:#cf1206;border-color:#cf1206;color:#fff}
+ input[type=range]{width:420px;accent-color:#cf1206}
+ #cfg{color:#5c5c6a;white-space:pre;font-size:12px;border-top:1px solid #1e1e26;padding-top:8px}
+ #warn{color:#e0a53a}
+</style></head><body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div class="row">
+  <button id="play">pause</button>
+  <input id="scrub" type="range" min="0" max="40" step="0.02" value="0">
+  <span id="t">0.00 s</span>
+  <button id="again">from the top</button>
+</div>
+<div class="row">
+  ending: <button data-k="source" data-v="video">video</button>
+          <button data-k="source" data-v="sheet">strip</button>
+  <button id="snap">snap to 4 tones</button>
+  &nbsp;phrase: <button data-k="type" data-v="outline">outline</button>
+                <button data-k="type" data-v="invert">invert</button>
+  &nbsp;waits <input id="textAt" type="range" min="0" max="8" step="0.1" style="width:150px">
+  <span id="textAtV"></span>
+  &nbsp;strip fps <input id="fps" type="range" min="2" max="30" step="1" style="width:110px">
+  <span id="fpsV"></span>
+  &nbsp;size <input id="size" type="range" min="0.4" max="1" step="0.01" style="width:150px">
+  <span id="sizeV"></span>
+</div>
+<div class="row">
+  which ending: <button data-w="YOU FOUND THE PARTY" class="on">YOU FOUND THE PARTY</button>
+                <button data-w="DEAD">DEAD</button>
+                <button data-w="ASH">ASH</button>
+  &nbsp;<span id="warn"></span>
+</div>
+<div class="row"><span><b>space</b> play/pause &nbsp; <b>&larr; &rarr;</b> a frame &nbsp;
+  <b>,</b> <b>.</b> a second &nbsp; <b>r</b> from the top &nbsp; <b>1</b>/<b>2</b> video/strip &nbsp;
+  <b>o</b>/<b>i</b> outline/invert</span></div>
+<div id="cfg"></div>
+<script type="module">
+// The whole point of this page: it does not draw the ending, the GAME draws
+// the ending.  It imports the same drawEnd() index.html does, hands it a
+// stand-in game object in the state it wants, and drives the one clock the
+// card runs off.  Anything that looks wrong here is wrong in the game.
+import { END } from '../src/config.js';
+import { drawEnd } from '../src/hud.js';
+import { loadBats, batsReady, batsUsing } from '../src/bats.js';
+import { loadDeathFonts, deathFontsSettled } from '../src/deathtype.js';
+
+loadDeathFonts();
+loadBats();
+
+const ctx = document.getElementById('c').getContext('2d');
+// Everything drawEndCard touches.  END_STATS is off, so the tally is not
+// reached and the stub does not have to carry a whole city.
+const game = { state: 'win', endTitle: 'YOU FOUND THE PARTY', endT: 0 };
+let t = 0, playing = true, last = 0;
+
+// Every control is also a query parameter, so a particular beat of a
+// particular setting can be linked, reloaded or screenshotted:
+//   ?t=2.6&source=sheet&type=invert&textAt=0.8&fps=8&title=ASH
+const Q = new URLSearchParams(location.search);
+for (const k of ['source', 'type']) if (Q.has(k)) END[k] = Q.get(k);
+if (Q.has('snap')) END.snap = Q.get('snap') === '1';
+for (const k of ['textAt', 'fps', 'size']) if (Q.has(k)) END[k] = +Q.get(k);
+if (Q.has('title')) {
+  game.endTitle = Q.get('title');
+  game.state = game.endTitle.startsWith('YOU FOUND') ? 'win' : 'lose';
+}
+if (Q.has('t')) { t = +Q.get('t'); playing = Q.get('play') === '1'; }
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (playing) t += dt;
+  // the game's own end-state branch: draw the card over whatever the frame
+  // left behind, which here is simply the last card
+  drawEnd(ctx, game, t);
+  ui();
+}
+requestAnimationFrame(frame);
+
+const $ = (id) => document.getElementById(id);
+function ui() {
+  $('t').textContent = t.toFixed(2) + ' s';
+  $('scrub').value = Math.min(40, t);
+  $('cfg').textContent =
+    `src/config.js   END = { source: '${END.source}', fps: ${END.fps}, ` +
+    `textAt: ${END.textAt}, size: ${END.size}, type: '${END.type}', snap: ${END.snap} }`;
+  $('warn').textContent =
+    !deathFontsSettled() ? 'the face is still loading'
+    : !batsReady() ? 'no bats loaded - the card will be flat red'
+    : END.source === 'video' && batsUsing() !== 'video'
+        ? 'the video is not ready - showing the strip instead'
+    : '';
+  for (const b of document.querySelectorAll('button[data-k]'))
+    b.classList.toggle('on', END[b.dataset.k] === b.dataset.v);
+  $('snap').classList.toggle('on', END.snap);
+  $('textAtV').textContent = END.textAt.toFixed(1) + ' s';
+  $('fpsV').textContent = END.fps;
+  $('sizeV').textContent = END.size.toFixed(2);
+}
+
+$('play').onclick = () => { playing = !playing; $('play').textContent = playing ? 'pause' : 'play'; };
+$('again').onclick = () => { t = 0; };
+$('snap').onclick = () => { END.snap = !END.snap; };
+$('scrub').oninput = (e) => { t = +e.target.value; playing = false; $('play').textContent = 'play'; };
+$('textAt').oninput = (e) => { END.textAt = +e.target.value; };
+$('fps').oninput = (e) => { END.fps = +e.target.value; };
+$('size').oninput = (e) => { END.size = +e.target.value; };
+$('textAt').value = END.textAt; $('fps').value = END.fps; $('size').value = END.size;
+$('play').textContent = playing ? 'pause' : 'play';
+for (const b of document.querySelectorAll('button[data-w]'))
+  b.classList.toggle('on', b.dataset.w === game.endTitle);
+for (const b of document.querySelectorAll('button[data-k]'))
+  b.onclick = () => { END[b.dataset.k] = b.dataset.v; };
+for (const b of document.querySelectorAll('button[data-w]'))
+  b.onclick = () => {
+    // losing and winning are not the same card: only the win gets the room
+    // behind the door, and drawEndCard branches on the state, not the words
+    game.endTitle = b.dataset.w;
+    game.state = b.dataset.w.startsWith('YOU FOUND') ? 'win' : 'lose';
+    for (const o of document.querySelectorAll('button[data-w]')) o.classList.toggle('on', o === b);
+  };
+
+addEventListener('keydown', (e) => {
+  const F = 1 / 12;
+  if (e.code === 'Space') { e.preventDefault(); $('play').click(); }
+  if (e.key === 'ArrowRight') { playing = false; t += F; }
+  if (e.key === 'ArrowLeft')  { playing = false; t = Math.max(0, t - F); }
+  if (e.key === '.') { playing = false; t += 1; }
+  if (e.key === ',') { playing = false; t = Math.max(0, t - 1); }
+  if (e.key === 'r') t = 0;
+  if (e.key === '1') END.source = 'video';
+  if (e.key === '2') END.source = 'sheet';
+  if (e.key === 'o') END.type = 'outline';
+  if (e.key === 'i') END.type = 'invert';
+  $('play').textContent = playing ? 'pause' : 'play';
+});
+</script></body></html>

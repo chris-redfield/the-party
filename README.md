@@ -197,19 +197,50 @@ way to win, and all three of them land on the same card, which is the one
 screen in the game that is not the game's palette at all. Flat blood red, edge
 to edge, the same `#cf1206` the cat's gift pours down the screen, because it is
 the same blood; it is just all outside you now. One phrase in black on it —
-`DEAD`, `ASH` or `YOU FOUND IT` — as big as the screen will take, and nothing
-else but the line telling you which key starts another night.
+`DEAD`, `ASH` or `YOU FOUND THE PARTY` — as big as the screen will take, and
+nothing else but the line telling you which key starts another night. The
+winning one is set at `END.size` of that, 0.85, because it is the only one of
+the three with a room behind it to share the screen with; the two losses still
+take all of it.
 
 **Winning is the same card with the party behind it.** Lose and the red is
 flat, because there is nothing behind it. Win and it is the room the door
-opened on: bats hanging in a row and swaying, on a loop. It is footage, not
-drawing — `assets/bats-win.png`, fifty-four frames of a bat colony laid out in
-a strip — but it is flattened to four flat tones of the card's own blood and
-dropped onto the game's art pixel, so it arrives as a poster rather than as a
-video playing in a window. Three things make it read as drawn rather than as
-compressed: the tone bands are decided **once over the whole cut** (per frame
-they crawl and the picture boils), every frame is first pulled onto a common
-exposure, and it runs at `WIN_BATS_FPS` 12 rather than the 30 it was shot at.
+opened on: bats hanging in a row and swaying. It is footage, not drawing —
+`assets/bats-ending.mp4`, thirty-nine seconds of a bat colony — but it is
+flattened to four flat tones of the card's own blood and dropped onto the
+game's art pixel, so it arrives as a poster rather than as a video playing in
+a window. Three things make it read as drawn rather than as compressed: the
+tone bands are decided **once over the whole cut** (per frame they crawl and
+the picture boils), every frame is first pulled onto a common exposure, and it
+runs at 12 fps rather than the 30 it was shot at.
+
+There are two sources and `END.source` picks between them, because they are
+good at different things. `'video'` is the 39-second clip: long enough that the
+card never visibly repeats, 2 MB, and it has to decode. `'sheet'` is
+`assets/bats-win.png`, fifty-four frames in a strip — four and a half seconds
+on a loop, 414 kB, one `drawImage`, and it cannot fail. The video is the
+default **and the strip is its fallback**: a browser that will not play the
+clip still gets bats rather than a flat card, and if neither loads the card
+goes flat red and the night still ends properly. The fallback is per *frame*,
+not per session — any frame the video cannot supply, while it seeks or
+buffers, is drawn from the strip, because a card with nothing behind the
+lettering is worse than one with the wrong bats behind it for a frame.
+
+**The video is snapped back onto its own four tones before it is drawn**, and
+that is not optional either. Flat colour is exactly what an ordinary encoder
+is worst at: h264 at 4:2:0 lands **half a per cent** of the clip's pixels
+exactly on one of the four, and leaves ringing on every edge, which on art this
+flat reads as a rendering fault rather than as compression. Lossless VP9 gets
+it right and costs 25 MB. So the 2 MB file stays and `END.snap` puts the tones
+back at draw time: the four differ almost entirely in red, so it is one
+256-entry table on that channel. Measured on the live card, **14.9% of pixels
+exactly on a tone becomes 97%** — the rest is the lettering's own edges. It
+costs one pass over 426 × 240 pixels — a ninth of the screen — and only when
+the video actually turns a frame over, which at 12 fps is a fifth of the times
+the card is drawn. `END.snap` false shows what the encoder really returned.
+`END_TONES` is the four, and they are what `preview/quantize.py` wrote; cut the
+clip with a different `--tones` and they change with it. The strip needs none
+of this — a PNG is exact.
 
 That middle one is not optional. The footage is not evenly lit — there are
 lightning hits at 0:19 and 1:04, a red-tinted stretch from 0:33 to 0:41, a
@@ -220,19 +251,38 @@ frame's tone distribution onto the clip's own before it bands anything, and any
 frame with no contrast left in it at all is dropped and the frame before it
 held in its place. Cutting the same four and a half seconds with `--regularise 0` shows
 what it is for. The cut that ships overlaps the flash at 0:46, so it needs this
-as much as the lightning does. The phrase waits `WIN_BATS_TEXT` seconds, so you get the
+as much as the lightning does. The phrase waits `END.textAt` seconds, so you get the
 room before you get told, and then it is set in black haloed in the blood —
-`WIN_TYPE`, which is `'outline'`. The other setting is `'invert'`, which cuts
+`END.type`, which is `'outline'`. The other setting is `'invert'`, which cuts
 the phrase out of whatever it lands on by drawing it in the red under
 `difference`: red comes out black, black comes out red, and it is the more
 striking of the two on a frame with a flat field behind it and close to
 unreadable on a frame that is all middle tones. `WIN_BATS` false puts the win
-back on the flat card. The strip costs 414 kB; the footage it came out of is
-29 MB, is not in the repo, and does not ship.
+back on the flat card. The footage both were cut out of is 29 MB, is not in
+the repo, and does not ship.
 
-`assets/bats-ending.mp4` is the same treatment applied to a longer cut — source
-0:06 to 0:45, 39 seconds, 468 frames, 2 MB — kept in the repo because the
-ending is going to use it. Nothing loads it yet.
+**Everything about how the ending plays is in one mutable object**, `END` in
+`src/config.js`, rather than in constants — `source`, `fps`, `textAt`, `type`.
+That is so `preview/ending.html` can turn them while the card is on screen.
+The game never writes to it; the values in the file are the shipped ones.
+
+### Looking at the ending without playing to the end
+
+`preview/ending.html` is the ending, not a drawing of it: it imports the same
+`drawEnd()` `index.html` does, hands it a stand-in game object in the state it
+wants, and drives the one clock the card runs off. Anything wrong there is
+wrong in the game. Scrub the card's own seconds, switch video against strip and
+outline against invert while it plays, drag `textAt` and the strip's frame rate
+about, and flip between the winning card and the two losing ones — which also
+switches the game *state*, because losing does not get the room behind the
+door. It prints the `END` line to paste into `src/config.js` once you like it.
+
+Every control is also a query parameter, so a particular beat of a particular
+setting can be linked or screenshotted:
+`preview/ending.html?t=2.6&source=sheet&type=invert&textAt=0.8&snap=0&title=ASH`.
+
+`assets/bats-ending.mp4` was cut from source 0:06 to 0:45 — 39 s, 468 frames,
+2 MB.
 
 To cut a different piece: `python3 preview/quantize.py --in 6 --len 39 --mp4
 assets/bats-ending.mp4` bands a stretch into something you can scrub in
@@ -244,7 +294,12 @@ assets/bats-win.png` writes the strip the win card loads. It prints the four
 
 A phrase of one word fills the width; a phrase of several stacks a word to a
 line and fills the height instead, and either way it is measured and scaled
-down to whatever actually fits, so nothing is ever cut off the edge.
+down to whatever actually fits, so nothing is ever cut off the edge. It is
+measured in the real face or not at all — Deathly arrives over the FontFace
+API, and a phrase measured in the Times fallback is set at the wrong size as
+well as in the wrong face — so the words wait for `deathFontsSettled()` the
+way the title card does. The room behind them does not wait; it is already
+holding them back for `END.textAt` seconds anyway.
 
 You do not get told how it went. Not when you die and not when you win: no
 prose, no tally of doors knocked or tips believed. You get told that it is
@@ -310,7 +365,7 @@ red field with not one black pixel on it, and at 5 s it is fully set.
 > cover commercial use — releasing this for money needs a licence from the
 > foundry, or a different face. Dystopian Canticle (SIL OFL, no such
 > restriction) is still in `assets/` and is a drop-in swap: change `FAMILY`,
-> `URL` and `SCALE` at the top of `src/deathtype.js`.
+> `FONT_URL` and `SCALE` at the top of `src/deathtype.js`.
 
 ### The hourglass
 
@@ -636,8 +691,8 @@ src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
 src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
-src/bats.js         the room behind the right door: the strip that plays
-                    under the winning card
+src/bats.js         the room behind the right door: the clip that plays
+                    under the winning card, and its still-image fallback
 src/audio.js        procedural sound, and the one recorded thing there is:
                     the soundtrack in assets/ost, streamed and looped
 src/sprites.js      PLACEHOLDER ART for everybody drawn out of code.

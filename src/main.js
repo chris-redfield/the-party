@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, END } from './config.js';
 import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
@@ -213,6 +213,8 @@ window.PARTY = {
   isWalkable,
   skipTo(min) { game.clock.t = min / MIN_PER_SEC; },
   vision(sec) { game.vision = sec === undefined ? VISION_SECONDS : sec; },
+  /** the ending's live dials - preview/ending.html turns these too */
+  END,
   win() { knock(game, game.city.party); },
   /** ms a frame of city costs - the scenery is the expensive half. */
   bench(n = 40) {

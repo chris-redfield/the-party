@@ -159,18 +159,47 @@ export const END_STATS = false;
 // The winning card is not flat: it is the party itself, a room of bats hanging
 // in a row and swaying, flattened to four tones of the card's own blood and
 // dropped onto the game's art pixel.  Set WIN_BATS false and the win goes back
-// to the flat red card the two losses land on.  The numbers describe
-// `assets/bats-win.png` and only change if that file is cut again.
+// to the flat red card the two losses land on.
 export const WIN_BATS = true;
-export const WIN_BATS_FPS = 12;        // footage is 30; 12 is where it reads as drawn
+// `assets/bats-win.png`: the short strip.  These only change if it is cut again
+// - preview/quantize.py prints them.
 export const WIN_BATS_W = 426;         // one frame, in art pixels (x3 on screen)
 export const WIN_BATS_H = 240;
 export const WIN_BATS_N = 54;          // four and a half seconds of it, looping
 export const WIN_BATS_COLS = 8;        // how the strip is wrapped in the sheet
-export const WIN_BATS_TEXT = 1.4;      // seconds of bats before the phrase cuts in
-// How the phrase sits on the bats - 'invert' cuts it out of whatever is under
-// it, 'outline' sets it in black haloed in the blood.  See drawEndCard.
-export const WIN_TYPE = 'outline';
+
+// Everything about how the ending PLAYS lives in one mutable object rather
+// than in constants, because `preview/ending.html` runs the game's own
+// drawEnd() and turns these live - which is the only way a preview of the
+// ending can be trusted to be the ending.  The values written here are the
+// shipped ones; nothing in the game writes to it.
+export const END = {
+  // 'video' plays assets/bats-ending.mp4 (39 s), 'sheet' the short strip.
+  // A missing or unplayable video falls back to the strip, and a missing
+  // strip to the flat red card.
+  source: 'video',
+  fps: 12,          // the strip's own rate; the video carries its own
+  textAt: 1.4,      // seconds of bats before the phrase arrives
+  // How the phrase sits on the bats - 'invert' cuts it out of whatever it
+  // lands on, 'outline' sets it in black haloed in the blood.  See drawEndCard.
+  type: 'outline',
+  // How big the phrase is set on the winning card, as a fraction of the size
+  // it would otherwise fill.  1 is as large as it will go, which is what the
+  // two losing cards still do - they have nothing behind them to share the
+  // screen with, and this one does.
+  size: 0.85,
+  // The video comes back off the encoder soft: h264 lands only half a per cent
+  // of its pixels exactly on one of the four tones, and a flat palette with
+  // ringing on every edge is the one thing this game's look cannot carry.  So
+  // each frame is snapped back onto the four before it is blown up - at art
+  // size, which is a fiftieth of the pixels doing it after.  Turn it off to
+  // see what the encoder actually gives back.  The strip needs none of this.
+  snap: true,
+};
+// The four tones, which are what preview/quantize.py wrote: the card's black,
+// the card's blood, and two even steps between them.  If the clip is ever cut
+// with a different --tones, these change with it.
+export const END_TONES = ['#0b0b0b', '#4c0d09', '#8e1008', '#cf1206'];
 
 // --- the night --------------------------------------------------------------
 // Six in-game hours in six real minutes: one real second is one game minute,

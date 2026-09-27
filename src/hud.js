@@ -1,7 +1,7 @@
 import {
   VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, WORLD,
   VISION_SECONDS, VISION_WARN, GLASS_CLOCK_TEXT, MAX_TIPS, END_STATS,
-  WIN_BATS, WIN_BATS_TEXT, WIN_TYPE,
+  WIN_BATS, END,
 } from './config.js';
 import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
 import { DISTRICTS, blockAt } from './city.js';
@@ -900,8 +900,8 @@ function drawEndCard(ctx, game, t) {
 
   // The card cuts its words out of the red in black.  Over the bats there is
   // no one colour to cut out of - black type would vanish into a black bat -
-  // and WIN_TYPE says what to do about it.  Either way the phrase waits
-  // WIN_BATS_TEXT seconds, so you get the room before you get told.
+  // and END.type says what to do about it.  Either way the phrase waits
+  // END.textAt seconds, so you get the room before you get told.
   //
   //   'invert'   drawn in the red under `difference`, so red comes out black
   //              and black comes out red: the phrase is cut out of whatever
@@ -912,16 +912,23 @@ function drawEndCard(ctx, game, t) {
   //              on every frame, and is the same rule as the ENTER line.
   //
   // Both stay inside the card's two colours.  Neither is furniture: pick one.
-  const invert = bats && WIN_TYPE === 'invert';
+  const invert = bats && END.type === 'invert';
   if (bats) {
-    if (t < WIN_BATS_TEXT) return drawEndFooter(ctx, t, true);
+    if (t < END.textAt) return drawEndFooter(ctx, t, true);
     if (invert) { ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = BLOOD_RED; }
   }
 
   // The phrase is set as large as it will go: DEAD and ASH are one word and
-  // fill the width, YOU FOUND IT stacks a word to a line and fills the
-  // height.  Both are measured at DEATH_SIZE and scaled down to whatever
+  // fill the width, YOU FOUND THE PARTY stacks a word to a line and fills
+  // the height.  Both are measured at DEATH_SIZE and scaled down to whatever
   // actually fits, so nothing is ever cut off the edge.
+  //
+  // It is measured in the real face or not at all: Deathly arrives over the
+  // FontFace API, and a phrase measured in the Times fallback is set at the
+  // wrong size AND in the wrong face for the moment before it lands.  The
+  // card is already holding the room back for END.textAt seconds, so holding
+  // the words as well costs nothing.
+  if (!deathFontsSettled()) { ctx.globalCompositeOperation = 'source-over'; return drawEndFooter(ctx, t, bats); }
   const words = game.endTitle.toUpperCase().split(/\s+/).filter(Boolean);
   setDeathFont(ctx, DEATH_SIZE);
   let size = DEATH_SIZE;
@@ -932,6 +939,9 @@ function drawEndCard(ctx, game, t) {
   if (words.length > 1) {
     size = Math.min(size, STACK_ROOM / ((words.length - 1) * LINE_PITCH + 0.78));
   }
+  // the winning card shares the screen with the room behind it, so it does not
+  // take all of it - the two losing cards still do
+  if (bats) size *= END.size;
   setDeathFont(ctx, size);
   const cap = ctx.measureText('H').actualBoundingBoxAscent || size * 0.72;
   const lh = size * LINE_PITCH;

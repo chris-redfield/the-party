@@ -12,7 +12,10 @@
 // ---------------------------------------------------------------------------
 
 const FAMILY = 'PartyDeathly';
-const URL = 'assets/deathly/Font1.otf';
+// Resolved against this module rather than against the page, so the dev pages
+// in preview/ load the same face the game does instead of looking for it
+// beside themselves.
+const FONT_URL = new URL('../assets/deathly/Font1.otf', import.meta.url).href;
 const SCALE = 1;             // measured at 100px: cap 87, H 49.7 wide
 
 let ready = false;
@@ -31,12 +34,12 @@ let settled = false;
  */
 export async function loadDeathFonts() {
   try {
-    const face = new FontFace(FAMILY, `url(${URL})`);
+    const face = new FontFace(FAMILY, `url(${FONT_URL})`);
     await face.load();
     document.fonts.add(face);
     ready = true;
   } catch (e) {
-    console.warn(`death type: ${URL} did not load`, e);
+    console.warn(`death type: ${FONT_URL} did not load`, e);
   } finally {
     settled = true;
   }

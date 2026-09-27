@@ -121,7 +121,11 @@ def main():
             [enc, '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24',
              '-s', f'{w}x{h}', '-r', str(a.fps), '-i', '-',
              # whatever h264 this ffmpeg has; four flat colours need no bitrate
-             '-c:v', a.codec, '-pix_fmt', 'yuv420p', '-crf', str(a.crf), a.mp4],
+             *(['-c:v', 'libvpx-vp9', '-lossless', '1', '-pix_fmt', 'yuv444p',
+                '-row-mt', '1', '-speed', '2']
+               if a.codec == 'lossless' else
+               ['-c:v', a.codec, '-pix_fmt', 'yuv420p', '-crf', str(a.crf)]),
+             a.mp4],
             stdin=subprocess.PIPE)
         p.communicate(out.tobytes())
         # the scrub page needs to know where in the SOURCE this copy starts, or

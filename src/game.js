@@ -318,7 +318,7 @@ export function knock(game, door) {
   if (door.isParty) {
     game.state = 'win';
     game.endT = 0;
-    game.endTitle = 'YOU FOUND IT';
+    game.endTitle = 'YOU FOUND THE PARTY';
     game.endText =
       'The door opens on a wall of sound and a room with no mirrors in it. ' +
       'Nobody asks for your invitation. Somebody hands you something red in a ' +
