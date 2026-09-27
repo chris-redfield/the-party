@@ -124,6 +124,8 @@ export function populate(rng, city) {
           group: `${block.id},${gi}`,
           spec: kidSpec(rng), frame: 0, anim: rng.range(0, 6),
           state: stationary ? 'idle' : 'patrol',
+          // the drawings' own direction, until it takes a step and finds out
+          faceLeft: true,
           bump: 0, following: false, distract: 0, sayT: 0,
           ...ringPoint(block, tt, lat),
         });
@@ -245,10 +247,22 @@ export function populate(rng, city) {
 // ---------------------------------------------------------------------------
 // Updates
 // ---------------------------------------------------------------------------
+// The drawings face left, so a child heading right is the mirrored one.  It is
+// taken from the ground covered rather than from `dir`, which is which way
+// round the block the child is going and says nothing about the screen: the
+// same `dir` walks it left along one side of a block and right along the
+// other.  Walking straight up or down there is nothing to take, so it holds
+// whichever way it last faced - a child that snapped back to a default facing
+// every time it turned a corner would flicker on every corner.
+function faceFrom(k, x0) {
+  if (Math.abs(k.x - x0) > 0.02) k.faceLeft = k.x < x0;
+}
+
 export function updateKid(k, dt, player) {
   k.anim += dt;
   if (k.bump > 0) k.bump -= dt;
   if (k.chatter > 0) k.chatter -= dt;
+  const x0 = k.x;
 
   if (k.following) {
     // trail the player, jostling for position
@@ -260,6 +274,7 @@ export function updateKid(k, dt, player) {
     k.x += (dx / d) * sp * dt;
     k.y += (dy / d) * sp * dt;
     k.frame = sp > 8 ? (Math.floor(k.anim * 7) % 2) : -1;
+    faceFrom(k, x0);
     return;
   }
   if (k.state === 'patrol') {
@@ -267,6 +282,7 @@ export function updateKid(k, dt, player) {
     const p = ringPoint(k.block, k.t, k.lat);
     k.x = p.x; k.y = p.y; k.seg = p.seg;
     k.frame = Math.floor(k.anim * 6) % 2;
+    faceFrom(k, x0);
   } else {
     k.frame = -1;
   }

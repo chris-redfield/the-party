@@ -656,9 +656,18 @@ Their walk runs off the child's own animation clock rather than off the
 `frame` number the coded sprite takes, since that frame only ever counts 0, 1
 — it was written for a two-pose walk and would cost every one of them their
 third drawing. It steps at the same six beats a second `updateKid()` drives
-the coded walk at, so a street of children still steps together. They are only
-ever drawn facing you: the kids walk a block's ring rather than a compass, and
-nothing in the crowd has a back.
+the coded walk at, so a street of children still steps together.
+
+**They are drawn facing left, so a child heading right is that drawing
+mirrored.** Which way a child faces is taken from the ground it covers and not
+from `dir` — `dir` is which way round the block it is going and says nothing
+about the screen, since the same `dir` walks it left along one side of a block
+and right along the other. Up and down the vertical sides there is nothing to
+take, so it holds whichever way it last faced; a child that snapped back to a
+default at every corner would flicker at every corner. Checked over a few
+thousand samples of children actually walking: facing matched travel direction
+every time, none wrong. Nobody has a back — the kids walk a block's ring, not
+a compass, and there is no drawing of anybody from behind.
 
 The coded children in `src/sprites.js` are not gone — they are what stands on
 the pavement in the moment before the sheets land, and what is left if one

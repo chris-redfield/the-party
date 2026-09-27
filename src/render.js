@@ -128,8 +128,8 @@ function swapAt(mix) { return Math.max(0, Math.min(1, (mix - 0.3) / 0.4)); }
 // wearing has to be the same kind of thing as the child standing next to it,
 // or the disguise is the tell.  The coded sprite is what is left if a sheet
 // never arrives, and what stands there in the moment before it does.
-function childSprite(spec, dir, frame, anim, scale) {
-  return childFrame(spec.art, frame, anim, scale)
+function childSprite(spec, dir, frame, anim, faceLeft, scale) {
+  return childFrame(spec.art, frame, anim, faceLeft, scale)
     || personSprite(spec, dir, frame, scale);
 }
 
@@ -177,7 +177,7 @@ function drawPerson(ctx, e, o, t) {
     // real monsters cast no shadow. that is the tell, once you can see them.
     if (swap < 1) shadow(ctx, gx, gy, z, 9, 0.35 * (1 - swap));
     if (swap < 1) {
-      const kid = childSprite(e.disguise, dir, frame, e.anim, scale);
+      const kid = childSprite(e.disguise, dir, frame, e.anim, e.faceLeft !== false, scale);
       drawSprite(ctx, kid, gx, sy, 1);
       drawSprite(ctx, greySprite(kid), gx, sy, MIX.vision);   // drains like any child
     }
@@ -190,7 +190,7 @@ function drawPerson(ctx, e, o, t) {
     }
   } else {
     shadow(ctx, gx, gy, z, 9);
-    const cv = childSprite(e.spec, dir, frame, e.anim, scale);
+    const cv = childSprite(e.spec, dir, frame, e.anim, e.faceLeft !== false, scale);
     drawSprite(ctx, cv, gx, gy, 1);
     // the living go black and white. only the monsters keep their colour.
     if (MIX.vision > 0) drawSprite(ctx, greySprite(cv), gx, gy, MIX.vision);

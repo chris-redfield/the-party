@@ -410,6 +410,9 @@ export function nosferatuArt(scale) { return still('nosferatu', NOSFERATU_BOX, s
 // one of them their third drawing.  Same cadence the coded walk runs at, so a
 // street of children still steps together.
 //
+// They all face left, and a child heading right is that drawing mirrored - see
+// faceFrom() in entities.js for where the facing comes from.
+//
 // Which child a child is, is `seed` modulo however many drawings turned up:
 // one seed per kid, rolled once when the city is populated.  Nobody is
 // weighted and nobody is special - the witch takes her turn as one of fifteen
@@ -417,7 +420,7 @@ export function nosferatuArt(scale) { return still('nosferatu', NOSFERATU_BOX, s
 const CHILD_IDLE = 1;
 const CHILD_RATE = 6;                   // beats a second, as in updateKid()
 
-export function childFrame(seed, frame, anim, scale) {
+export function childFrame(seed, frame, anim, faceLeft, scale) {
   if (seed == null || !children.length) return null;
   const kid = children[((seed % children.length) + children.length) % children.length];
   const rows = kid.grid.length;
@@ -427,7 +430,8 @@ export function childFrame(seed, frame, anim, scale) {
   if (!cell) return null;
   // kid.unit * childPx is this child's own height at the crowd's one scale -
   // see CHILD_BOX.  It is not a number anybody chose for this child.
-  return scaled(`${kid.key}|${row}`, cell, kid, kid.unit * childPx, false, scale);
+  // They are all drawn facing left, so the child walking right is the mirror.
+  return scaled(`${kid.key}|${row}`, cell, kid, kid.unit * childPx, !faceLeft, scale);
 }
 
 // Which drawing the cat is standing in.  `pose` is the animal's own state -
