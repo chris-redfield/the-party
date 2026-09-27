@@ -1,6 +1,7 @@
 import {
   VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, WORLD,
   VISION_SECONDS, VISION_WARN, GLASS_CLOCK_TEXT, MAX_TIPS, END_STATS,
+  WIN_BATS, WIN_BATS_TEXT, WIN_TYPE,
 } from './config.js';
 import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
 import { DISTRICTS, blockAt } from './city.js';
@@ -8,6 +9,7 @@ import { shortFact, cardFact, addressOf, claimedIds, FACT_KEYS } from './hints.j
 // the red the cat's gift pours down the screen, which is the red you dry into
 import { BLOOD_RED } from './render.js';
 import { deathText, setDeathFont, deathFontsSettled } from './deathtype.js';
+import { drawBats } from './bats.js';
 // the chalices are drawn in the same line as the city - see src/ink.js
 import { inkEdge, INK_COLOR } from './ink.js';
 import { INK, CHALICE } from './config.js';
@@ -887,9 +889,34 @@ const LINE_PITCH = 0.84;         // line spacing, as a fraction of the size
 const STACK_ROOM = VIEW_H - 150; // ... and the air the ENTER line needs
 
 function drawEndCard(ctx, game, t) {
-  ctx.fillStyle = BLOOD_RED;
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // Losing is the flat card.  Winning is the room behind the door, in the same
+  // two colours the card was always made of - see src/bats.js.
+  const bats = WIN_BATS && game.state === 'win' && drawBats(ctx, t);
+  if (!bats) {
+    ctx.fillStyle = BLOOD_RED;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
   ctx.fillStyle = '#000000';
+
+  // The card cuts its words out of the red in black.  Over the bats there is
+  // no one colour to cut out of - black type would vanish into a black bat -
+  // and WIN_TYPE says what to do about it.  Either way the phrase waits
+  // WIN_BATS_TEXT seconds, so you get the room before you get told.
+  //
+  //   'invert'   drawn in the red under `difference`, so red comes out black
+  //              and black comes out red: the phrase is cut out of whatever
+  //              it happens to land on.  Strongest where the frame behind it
+  //              is flat, weakest on a frame that is all middle tones.
+  //   'outline'  black letters haloed in the blood, which is what every other
+  //              thin face in the game gets over the street.  Reads the same
+  //              on every frame, and is the same rule as the ENTER line.
+  //
+  // Both stay inside the card's two colours.  Neither is furniture: pick one.
+  const invert = bats && WIN_TYPE === 'invert';
+  if (bats) {
+    if (t < WIN_BATS_TEXT) return drawEndFooter(ctx, t, true);
+    if (invert) { ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = BLOOD_RED; }
+  }
 
   // The phrase is set as large as it will go: DEAD and ASH are one word and
   // fill the width, YOU FOUND IT stacks a word to a line and fills the
@@ -909,7 +936,17 @@ function drawEndCard(ctx, game, t) {
   const cap = ctx.measureText('H').actualBoundingBoxAscent || size * 0.72;
   const lh = size * LINE_PITCH;
   const top = VIEW_H / 2 - ((words.length - 1) * lh) / 2 + cap / 2;
-  words.forEach((w, i) => deathText(ctx, w, MID, top + i * lh, size));
+  words.forEach((w, i) => {
+    if (bats && !invert) {
+      ctx.lineWidth = Math.max(4, size * 0.05);
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = BLOOD_RED;
+      ctx.textAlign = 'center';
+      ctx.strokeText(w, MID, top + i * lh);
+      ctx.fillStyle = '#0b0b0b';
+    }
+    deathText(ctx, w, MID, top + i * lh, size);
+  });
 
   // Off by default: the night is over, and how it went is not the point.
   if (END_STATS) {
@@ -918,8 +955,28 @@ function drawEndCard(ctx, game, t) {
     });
   }
 
-  if (Math.floor(t * 2) % 2) {
-    deathText(ctx, 'PRESS ENTER FOR ANOTHER NIGHT', MID, VIEW_H - 46, 30);
+  ctx.globalCompositeOperation = 'source-over';
+  drawEndFooter(ctx, t, bats);
+}
+
+// The line that starts another night blinks on both cards.  Inverting it the
+// way the phrase is inverted does not work at this size - a thin face over a
+// busy field comes out at whatever contrast the pixel under it happens to
+// give.  So it gets what every other thin face in the game gets over the
+// street: an outline.  Black letters haloed in the blood read on the red and
+// on the bats both, and it is still only the two colours.
+const FOOTER = 'PRESS ENTER FOR ANOTHER NIGHT';
+function drawEndFooter(ctx, t, onBats) {
+  if (!(Math.floor(t * 2) % 2)) return;
+  ctx.globalCompositeOperation = 'source-over';
+  if (onBats) {
+    setDeathFont(ctx, 30);
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 6; ctx.lineJoin = 'round';
+    ctx.strokeStyle = BLOOD_RED;
+    ctx.strokeText(FOOTER, MID, VIEW_H - 46);
   }
+  ctx.fillStyle = '#0b0b0b';
+  deathText(ctx, FOOTER, MID, VIEW_H - 46, 30);
 }
 

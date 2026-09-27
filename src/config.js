@@ -117,8 +117,19 @@ export const VISION_TAPER = 0.30;
 export const VISION_WARN = VISION_SECONDS * VISION_TAPER;   // HUD starts flashing
 // The cat's gift arrives as blood running down the screen: it pours in from
 // the top on dripping runs, covers everything for a beat, and then slides off
-// the bottom - by which time the city behind it has changed.
+// the bottom - and the city changes as it goes, not behind it.
 export const VISION_BLEED = 1.5;
+// Where in the pour the sheet stops holding and starts leaving, as a fraction
+// of VISION_BLEED.  drawBleed's own timing.
+export const VISION_BLEED_GO = 0.72;
+// How much of the pour the changeover WAITS OUT before the city starts
+// turning, as a fraction of VISION_BLEED.  This is the one dial for it.
+//   0     the city turns under the blood and is done before it lifts
+//   0.36  turns while the sheet is still coming down, most of the way through
+//         by the time it leaves, finished just after  <- here
+//   0.72  holds until the sheet starts to go, then turns in the open
+export const VISION_WAIT = 0.36;
+export const VISION_DELAY = VISION_BLEED * VISION_WAIT;       // ~0.54 s
 // how much of the changeover has to have happened before a monster stops
 // looking like a child - the prompt and the picture use the same number
 export const REVEAL = 0.5;
@@ -143,6 +154,23 @@ export const GLASS_CLOCK_TEXT = false;
 // The end of a night is one phrase on a flat red field and nothing else - no
 // prose, no tally of how it went.  Set true to put the stats back under it.
 export const END_STATS = false;
+
+// --- what is behind the right door ------------------------------------------
+// The winning card is not flat: it is the party itself, a room of bats hanging
+// in a row and swaying, flattened to four tones of the card's own blood and
+// dropped onto the game's art pixel.  Set WIN_BATS false and the win goes back
+// to the flat red card the two losses land on.  The numbers describe
+// `assets/bats-win.png` and only change if that file is cut again.
+export const WIN_BATS = true;
+export const WIN_BATS_FPS = 12;        // footage is 30; 12 is where it reads as drawn
+export const WIN_BATS_W = 426;         // one frame, in art pixels (x3 on screen)
+export const WIN_BATS_H = 240;
+export const WIN_BATS_N = 72;          // six seconds of it, looping
+export const WIN_BATS_COLS = 8;        // how the strip is wrapped in the sheet
+export const WIN_BATS_TEXT = 1.4;      // seconds of bats before the phrase cuts in
+// How the phrase sits on the bats - 'invert' cuts it out of whatever is under
+// it, 'outline' sets it in black haloed in the blood.  See drawEndCard.
+export const WIN_TYPE = 'outline';
 
 // --- the night --------------------------------------------------------------
 // Six in-game hours in six real minutes: one real second is one game minute,

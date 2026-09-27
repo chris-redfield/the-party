@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"><title>bats - look test</title>
+<style>
+ body{margin:0;background:#0a0a0c;color:#8a8a96;font:13px monospace;display:flex;
+      flex-direction:column;align-items:center;gap:8px;padding:10px}
+ canvas{image-rendering:pixelated;width:1280px;max-width:98vw;border:1px solid #222}
+ b{color:#cf1206}
+</style></head><body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div id="lab"></div>
+<div><b>1-6</b> treatment &nbsp; <b>T</b> the phrase on top &nbsp; <b>SPACE</b> pause
+ &nbsp; <b>[ ]</b> frame rate &nbsp; <b>&larr; &rarr;</b> step a frame</div>
+<script>
+const KEYS = ['v6_2','v4_2','v3_2','v3_3','v3_4','v2_5'];
+const NAME = {v6_2:'1   6 px, 2 tones   what you saw first',
+              v4_2:'2   4 px, 2 tones',
+              v3_2:'3   3 px, 2 tones   - 3 px is the game\'s own art pixel',
+              v3_3:'4   3 px, 3 tones',
+              v3_4:'5   3 px, 4 tones   <- this is the one in the game',
+              v2_5:'6   2 px, 5 tones   nearly the footage again'};
+const meta = fetch('meta2.json').then(r=>r.json());
+const imgs = {};
+for (const k of KEYS) { const i = new Image(); i.src = k + '.png'; imgs[k] = i; }
+new FontFace('PartyDeathly','url(../assets/deathly/Font1.otf)').load()
+  .then(f=>document.fonts.add(f)).catch(()=>{});
+
+const ctx = document.getElementById('c').getContext('2d');
+const Q = new URLSearchParams(location.search);
+let M=null, cur=Q.get('v')||'v3_4', f=+(Q.get('f')||0), fps=+(Q.get('fps')||12),
+    playing=Q.get('f')===null, type=Q.get('type')==='1';
+meta.then(m=>{ M=m; requestAnimationFrame(loop); });
+
+let last=0, acc=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const m = M[cur]; if (!imgs[cur].complete) return;
+  acc += (now-last)/1000; last = now;
+  if (playing && acc > 1/fps) { f = (f + Math.floor(acc*fps)) % m.n; acc = 0; }
+  draw();
+}
+function draw(){
+  const m = M[cur];
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(imgs[cur], (f%m.cols)*m.w, Math.floor(f/m.cols)*m.h, m.w, m.h,
+                0, 0, 1280, 720);
+  if (type) {
+    // what the game does: black letters haloed in the blood, WIN_TYPE 'outline'
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font = '220px PartyDeathly';
+    ctx.lineWidth = 11; ctx.lineJoin='round'; ctx.strokeStyle = '#cf1206';
+    ctx.fillStyle = '#0b0b0b';
+    for (const [w,y] of [['YOU FOUND',300],['IT',500]]) {
+      ctx.strokeText(w,640,y); ctx.fillText(w,640,y);
+    }
+  }
+  document.getElementById('lab').textContent =
+    NAME[cur] + '     frame ' + (f+1) + '/' + m.n + '   ' + fps + ' fps' +
+    (playing ? '' : '   PAUSED');
+}
+addEventListener('keydown', e => {
+  const i = '123456'.indexOf(e.key);
+  if (i >= 0) { cur = KEYS[i]; f = 0; }
+  if (e.key === 't' || e.key === 'T') type = !type;
+  if (e.code === 'Space') { playing = !playing; e.preventDefault(); }
+  if (e.key === '[') fps = Math.max(2, fps - 2);
+  if (e.key === ']') fps = Math.min(30, fps + 2);
+  if (e.key === 'ArrowRight') { playing=false; f = (f+1) % M[cur].n; draw(); }
+  if (e.key === 'ArrowLeft')  { playing=false; f = (f-1+M[cur].n) % M[cur].n; draw(); }
+});
+</script></body></html>

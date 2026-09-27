@@ -9,6 +9,7 @@ import { makeCamera, updateCamera, drawScene, drawBleed, setWorldLattice } from 
 import { drawHud, drawTitle, drawEnd, drawPause, cardAt, tipVotes } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic } from './audio.js';
 import { loadDeathFonts } from './deathtype.js';
+import { loadBats } from './bats.js';
 import { loadArtwork } from './artwork.js';
 
 const canvas = document.getElementById('game');
@@ -28,6 +29,8 @@ fit();
 // anything can be drawn with it.  Nothing waits on this: it is wanted minutes
 // into a night at the earliest, and until it lands the screen sets in serif.
 loadDeathFonts();
+// the sheet behind the winning card; it is never needed in a hurry
+loadBats();
 // The drawn characters - the vampire, the monsters he finds, and one of the
 // children - cut out of their sheets.  Nothing waits on this either: until
 // they land, every one of them is drawn with the placeholder sprites.
@@ -108,7 +111,10 @@ function frame(now) {
     setBassProximity(game.state === 'win' ? 0.9 : 0);
     updateCamera(cam, game.player, dt);
     drawScene(ctx, cam, game);
-    drawEnd(ctx, game, now / 1000);
+    // the card runs off its own clock, not the page's: the bats have to start
+    // at their first frame and the phrase has to land a beat after them
+    game.endT += dt;
+    drawEnd(ctx, game, game.endT);
     if (input.pressed('start')) restart();
   } else {
     if (input.pressed('pause')) { paused = !paused; setMusicPaused(paused); }

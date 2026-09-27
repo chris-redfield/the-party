@@ -1,6 +1,6 @@
 import {
   TILE, TILE_N, WORLD, VIEW_W, VIEW_H, PX,
-  LIGHTING, DAWN_TINT, BUMP_ANIM, VISION_BLEED, BAT_POOF,
+  LIGHTING, DAWN_TINT, BUMP_ANIM, VISION_BLEED, VISION_BLEED_GO, BAT_POOF,
 } from './config.js';
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
@@ -540,7 +540,7 @@ const RUNS = (() => {
 // the whole screen it does not drain anywhere - it just goes, and what is
 // underneath was never the city you were looking at.
 const POUR_END = 0.62;             // covered by here
-const FADE_START = 0.72;           // holds until here, then goes
+const FADE_START = VISION_BLEED_GO;  // holds until here, then goes
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
 export function drawBleed(ctx, game) {

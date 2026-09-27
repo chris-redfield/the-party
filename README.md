@@ -193,12 +193,31 @@ counting cards.
 ### How a night ends
 
 There are two ways to lose — the blood runs out, or the sun comes up — and one
-way to win, and all three of them land on the same screen, which is the one
+way to win, and all three of them land on the same card, which is the one
 screen in the game that is not the game's palette at all. Flat blood red, edge
 to edge, the same `#cf1206` the cat's gift pours down the screen, because it is
 the same blood; it is just all outside you now. One phrase in black on it —
 `DEAD`, `ASH` or `YOU FOUND IT` — as big as the screen will take, and nothing
 else but the line telling you which key starts another night.
+
+**Winning is the same card with the party behind it.** Lose and the red is
+flat, because there is nothing behind it. Win and it is the room the door
+opened on: bats hanging in a row and swaying, on a loop. It is footage, not
+drawing — `assets/bats-win.png`, seventy-two frames of a bat colony laid out in
+a strip — but it is flattened to four flat tones of the card's own blood and
+dropped onto the game's art pixel, so it arrives as a poster rather than as a
+video playing in a window. Two things make it read as drawn rather than as
+compressed: the tone bands are decided **once over the whole clip** (per frame
+they crawl and the picture boils), and it runs at `WIN_BATS_FPS` 12 rather than
+the 30 it was shot at. The phrase waits `WIN_BATS_TEXT` seconds, so you get the
+room before you get told, and then it is set in black haloed in the blood —
+`WIN_TYPE`, which is `'outline'`. The other setting is `'invert'`, which cuts
+the phrase out of whatever it lands on by drawing it in the red under
+`difference`: red comes out black, black comes out red, and it is the more
+striking of the two on a frame with a flat field behind it and close to
+unreadable on a frame that is all middle tones. `WIN_BATS` false puts the win
+back on the flat card. The strip costs 509 kB; the footage it came out of is
+29 MB and does not ship.
 
 A phrase of one word fills the width; a phrase of several stacks a word to a
 line and fills the height instead, and either way it is measured and scaled
@@ -208,6 +227,11 @@ You do not get told how it went. Not when you die and not when you win: no
 prose, no tally of doors knocked or tips believed. You get told that it is
 over. `END_STATS` in `src/config.js` puts the tally back underneath if you
 want it.
+
+The `PRESS ENTER` line gets an outline on the bats whichever way the phrase is
+set, because a face that thin over a busy field lands at whatever contrast the
+pixel under it happens to give — which is the same reason every floating line
+in the game is stroked.
 
 It is set in **Deathly**, the only real typeface in the game — everything
 else, down to the hourglass, is drawn out of code. It is not only on the end
@@ -304,8 +328,8 @@ nothing to say. You have walked past a dozen of them already.
 into one and it decides. Blood comes down over the whole screen — a sheet
 pouring from the top on runs of different lengths, each ending in a heavy
 rounded drop, with a few already falling free of it. It covers everything, and
-then it fades, and what is underneath is not the city it covered. For thirty
-seconds:
+then it goes — and the city turns underneath it as it comes down and leaves,
+rather than being already turned when it lifts. For thirty seconds:
 
 - the colour drains out of everyone living, and only the monsters keep theirs
 - the street lamps turn out to have been torches the entire time
@@ -362,7 +386,19 @@ drawn from the changeover rounded to `VISION_STEPS` fixed stages, so the world
 jerks its way back in about half a second at a time. The people are deliberately
 not on that clock — they fade continuously — because a person moving in steps
 reads as a dropped frame, while a street doing it reads as the world changing.
-Going *in* is smooth either way, because going in is a wall of blood.
+Going *in* is stepped too, but at eighteen stages over `VISION_FADE` that is a
+jump every fifteenth of a second, and half of them happen under blood anyway.
+
+**Going in is timed against the blood.** The changeover does not begin with the
+pour. It waits out `VISION_WAIT` of it — the ~0.54 s the sheet spends building
+up over you — and then turns: about half done by the time the blood starts
+sliding off, four fifths of the way by the time it is gone, finished a quarter
+of a second later. So none of it happens in the clear before the blood, and
+none of it is finished and waiting when the blood lifts. `VISION_WAIT` is the
+whole dial: 0 puts it back under the blood entirely, `VISION_BLEED_GO` (0.72)
+holds it until the sheet is already leaving. While it is held the mix keeps
+whatever it already had, which also means a second cat taken mid-vision does
+not flash the city back to colour under the sheet.
 
 **Proximity.** Within about two blocks of the real party you start to hear the
 bass, and it gets louder. That is the only thing the world itself will tell
@@ -515,11 +551,16 @@ pass over the finished frame, which does light the people as well. It is off.
 it is the timer rather than scenery mood.
 
 `VISION_SECONDS` and `VISION_FADE` tune the cat's gift, `VISION_TAPER` is the
-fraction of it spent wearing off, `VISION_BLEED` the length of the pour and
+fraction of it spent wearing off, `VISION_BLEED` the length of the pour,
+`VISION_BLEED_GO` where in that pour the sheet starts to leave, `VISION_WAIT`
+how much of the pour the palette waits out before it turns — raise it and the
+city changes later and more in the open, lower it and the change goes back
+under the blood where you cannot see it — with `VISION_DELAY` the seconds the
+last two work out at, and
 `CAT_TOUCH` how close you have to pass, `VISION_STEPS` how coarsely the city
 steps between the two palettes. The blood is a pure overlay in `drawBleed` -
-it accelerates the way a falling thing does, covers for a beat and fades out,
-so nothing has to be timed against it. `REVEAL` is how far the changeover has
+it accelerates the way a falling thing does, covers for a beat and fades out;
+the changeover is the one thing timed against it. `REVEAL` is how far the changeover has
 to have gone before a monster drops its costume - the picture and the `[E]`
 prompt read the same number, so you can never talk to something that still
 looks like a child. `PUMPKINS_PER_BLOCK` and `PUMPKIN_CROSSING_CHANCE` are how many pumpkins are
@@ -572,6 +613,8 @@ src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
 src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
+src/bats.js         the room behind the right door: the strip that plays
+                    under the winning card
 src/audio.js        procedural sound, and the one recorded thing there is:
                     the soundtrack in assets/ost, streamed and looped
 src/sprites.js      PLACEHOLDER ART for everybody drawn out of code.

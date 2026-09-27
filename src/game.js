@@ -2,7 +2,7 @@ import {
   MIN_PER_SEC, NIGHT_MINUTES, BLOOD_DRAIN, BLOOD_MAX, MANA_MAX,
   CANDY_PER_WRONG_DOOR, PUNCH_BLOOD, BUMP_BLOOD, BUMP_STAGGER, BUMP_SHAKE,
   SIM_RADIUS, BASS_RADIUS, VISION_SECONDS, VISION_FADE, VISION_TAPER,
-  VISION_BLEED, REVEAL, CAT_TOUCH, MAX_TIPS,
+  VISION_BLEED, VISION_DELAY, REVEAL, CAT_TOUCH, MAX_TIPS,
 } from './config.js';
 import { makeRng, hashSeed } from './rng.js';
 import { buildCity, ringPoint, nearestRingT, blockAt, isWalkable } from './city.js';
@@ -51,7 +51,7 @@ export function newGame(seedStr, citySeed) {
     toasts: [], log: [],
     prompt: null, dialogue: null, target: null,
     vision: 0, visionMix: 0, bleed: 0, camShake: 0,
-    endTitle: '', endText: '',
+    endTitle: '', endText: '', endT: 0,   // seconds the end card has been up
     stats: { knocks: 0, talks: 0, bats: 0 },
   };
 }
@@ -110,13 +110,23 @@ export function updateGame(game, dt, input) {
   // not ease you into it - and then spends its last 30% draining away, which
   // is the whole palette, the torches and the monsters going with it.  At zero
   // the mix is exactly zero and you are back in the ordinary city.
+  //
+  // It does not start arriving until VISION_DELAY, which is part way down the
+  // pour: the city holds ordinary while the blood is building up over it, and
+  // turns as the sheet comes down and leaves.  Held there the mix keeps
+  // whatever it already was - nought on a fresh cat, so nothing changes in the
+  // clear first; one on a second cat, so the city does not flash back to
+  // colour under the sheet.
   if (game.bleed > 0) game.bleed = Math.max(0, game.bleed - dt);
   if (game.vision > 0) {
     game.vision = Math.max(0, game.vision - dt);
     const t = game.vision;
-    const taper = VISION_SECONDS * VISION_TAPER;
-    game.visionMix = Math.max(0, Math.min(1,
-      Math.min((VISION_SECONDS - t) / VISION_FADE, t / taper)));
+    const shown = VISION_SECONDS - t - VISION_DELAY;    // < 0 while covered
+    if (shown >= 0) {
+      const taper = VISION_SECONDS * VISION_TAPER;
+      game.visionMix = Math.max(0, Math.min(1,
+        Math.min(shown / VISION_FADE, t / taper)));
+    }
     if (game.vision === 0) {
       game.visionMix = 0;
       toast(game, 'the city goes back to normal. so do you.', '#8a7ea8');
@@ -307,6 +317,7 @@ export function knock(game, door) {
   game.stats.knocks++;
   if (door.isParty) {
     game.state = 'win';
+    game.endT = 0;
     game.endTitle = 'YOU FOUND IT';
     game.endText =
       'The door opens on a wall of sound and a room with no mirrors in it. ' +
@@ -467,6 +478,7 @@ function dropCandy(game) {
 function die(game, title, text) {
   if (game.state !== 'play') return;
   game.state = 'lose';
+  game.endT = 0;
   game.endTitle = title;
   game.endText = text;
   game.player.alive = false;
