@@ -743,7 +743,10 @@ function drawMinimap(ctx, game) {
   // the size it wants and the scroll is scaled until its clean part holds it.
   // Nothing here is a number picked to look right against a drawing; move to
   // a different scroll and the map still lands on the paper.
-  const MAP = 150, AIR = 13;                       // paper left round the map
+  // 150 and 13 were the original; this is those at 80%.  Everything else on
+  // the scroll is derived from them, so the pair of them resize the whole
+  // object - paper, rolls, torn edges and all - and nothing else has to know.
+  const MAP = 120, AIR = 10.4;                     // paper left round the map
   const [IX, IY, IW, IH] = SCROLL_ART.inner;
   const S = (MAP + AIR * 2) / IH;                  // the art's long side, in px
   // ...and then taken in horizontally until the clean part is only as wide as
@@ -758,7 +761,12 @@ function drawMinimap(ctx, game) {
   // and the map is the thing that must not shrink.  They get the dark outline
   // the vitals already use, which is what the HUD does when it has no panel.
   const sh = SCROLL_ART.h * S;
-  const sy = VIEW_H - 26 - 36 - sh;
+  // CAPS is the room under the sheet the two lines of writing need; FOOT is
+  // what is left under those.  The writing hangs off the bottom of the paper
+  // rather than off the screen, so lowering FOOT brings the sheet and its
+  // caption down together and keeps the gap between them.
+  const CAPS = 36, FOOT = 20;
+  const sy = VIEW_H - FOOT - CAPS - sh;
   drawScroll(ctx, sx, sy, S, sq);
 
   // The map, centred in the clean part of the sheet and then nudged right.

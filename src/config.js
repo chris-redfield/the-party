@@ -146,7 +146,12 @@ export const CAT_TOUCH = 26;           // walk this close and the cat does it
 // --- the hourglass ----------------------------------------------------------
 // The clock is not a clock.  It is an hourglass with the moon in the top bulb
 // and the sun in the bottom, and the same sand makes one out of the other.
-export const GLASS_UNIT = 4;          // px per unit of the hourglass's own grid
+// px per unit of the hourglass's own 31 x 46 grid.  Every part of the clock is
+// measured in these, so this is the one number that resizes it: 4 was the
+// original, 3.2 is that at 80%.  It does not move - drawClock anchors the
+// glass to the screen's top right corner rather than to its own width, so the
+// clock's right edge and its top stay exactly where they were at any size.
+export const GLASS_UNIT = 3.2;
 // The digits are gone on purpose.  Set true to put a readout back under it.
 export const GLASS_CLOCK_TEXT = false;
 
@@ -174,7 +179,7 @@ export const HUD_PANELS = false;
 // argument for the number in between is written where it is used, in
 // src/hud.js.  `mapShift` slides the city on the paper, in px, positive to
 // the right.  Live: `PARTY.scroll({turn: 0.2, mapShift: 20})`.
-export const SCROLL = { turn: 0.4, mapShift: 14 };
+export const SCROLL = { turn: 0.4, mapShift: 11 };
 
 export const BACK_WINDOWS = { on: false };
 
