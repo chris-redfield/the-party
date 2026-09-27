@@ -12,8 +12,8 @@ import { lerpHex } from './palette.js';
 import { deathText, setDeathFont, deathFontsSettled } from './deathtype.js';
 import { drawBats } from './bats.js';
 // the chalices are drawn in the same line as the city - see src/ink.js
-import { inkPoly, INK_COLOR } from './ink.js';
-import { INK, CHALICE } from './config.js';
+import { inkPoly, inkPath, INK_COLOR } from './ink.js';
+import { INK, CHALICE, SCROLL } from './config.js';
 
 const FONT = (px, bold = true) =>
   `${bold ? 'bold ' : ''}${px}px "Courier New", ui-monospace, monospace`;
@@ -553,15 +553,14 @@ function drawClues(ctx, tips) {
   const deck = deckOrder(tips);
   const { x: x0, y: y0 } = cardPos(0, Math.max(1, deck.length));
 
+  // An empty deck says nothing at all now.  It used to stand four lines of
+  // instructions next to the card back - nothing yet / find a cat / find a
+  // monster / believe half of it - and a count of nought out of five under
+  // them, which is the corner of the screen telling you how to play at the
+  // moment you are most likely to be looking at it.  The face-down card is
+  // the whole message: there is a deck, and there is nothing in it.
   if (!deck.length) {
     drawCardBack(ctx, x0, y0);
-    ctx.textAlign = 'left';
-    ctx.font = FONT(13);
-    ctx.fillStyle = '#7a7288';
-    ctx.fillText('nothing yet.', x0 + CARD_W + 14, y0 + 54);
-    ctx.fillText('find a cat,', x0 + CARD_W + 14, y0 + 74);
-    ctx.fillText('find a monster.', x0 + CARD_W + 14, y0 + 94);
-    ctx.fillText('believe half of it.', x0 + CARD_W + 14, y0 + 114);
   } else {
     // back to front: each card has to land on top of the one behind it
     for (let i = deck.length - 1; i >= 0; i--) {
@@ -574,6 +573,10 @@ function drawClues(ctx, tips) {
   // nothing about how much of it is true.  The denominator is there because
   // the night only hands over MAX_TIPS of them and you should be able to see
   // how many asks you have left - that is inventory, not deduction.
+  //
+  // It only appears once there is something to count.  "TOLD 0/5" under an
+  // empty deck is the same instruction the four lines were, in fewer words.
+  if (!deck.length) return;
   const full = deck.length >= MAX_TIPS;
   ctx.textAlign = 'left';
   ctx.font = FONT(12);
@@ -604,8 +607,114 @@ function drawClues(ctx, tips) {
 // against the deepest overlap would dim the shallow areas every time a new
 // tip arrived, which reads as the map quietly crossing them off - which is
 // exactly the deduction it is not allowed to do for you.
-const TIP_RAMP = ['#33234f', '#4a2a72', '#66309c', '#8639c8', '#a844e8'];
-const BLOCK_COLD = '#17161f';
+//
+// The ramp moved from violet to a wash of ink and iron-gall red when the map
+// became a scroll.  Same five absolute steps, same rule, read on paper
+// instead of out of a lit panel: an unmentioned block is the pale brown the
+// whole city is drawn in, and every tip that names a block pulls it darker
+// and redder.  The steps keep their spacing in LIGHTNESS, which is what makes
+// a depth of three recognisable at a glance and what survives the map being
+// glanced at rather than read.
+const TIP_RAMP = ['#c79a68', '#c8834d', '#c26036', '#ad3c25', '#8e1f18'];
+const BLOCK_COLD = '#c3ab7e';
+
+// --- THE SCROLL -------------------------------------------------------------
+// The map is a sheet of paper, and the sheet is not drawn by hand here - it is
+// TRACED OFF THE STOCK ART, in `preview/scroll-prep.py`, and then drawn in
+// this game's line.  Three goes at cutting one freehand all came out as a
+// beige rectangle with tubes stuck on it; the torn edges especially are
+// fiddly and good in the reference and were terrible every time I drew them.
+//
+// What the prep script hands over (`src/scrollart.js`) is four bands of flat
+// region in 0..1 units, and nothing else - no image ships, and not one pixel
+// of the original's paint survives.  The trick that gets rid of the airbrush
+// is in the script: the reference's gradients run INSIDE its regions rather
+// than across them, so splitting it into regions by luminance and filling
+// each one flat removes the shading and keeps the drawing.  Quantising the
+// colours instead would have laid contour lines across the sheet.
+//
+// Here we only have to fill those regions in the HUD's own colours and run
+// `inkPath` round them - the city's line, on the reference's shape.
+//
+// `inner` is the biggest rectangle of plain sheet on it, measured by the
+// script rather than guessed, and the whole scroll is sized off that: the map
+// is given the width it needs and the paper grows to suit.
+import { SCROLL_ART } from './scrollart.js';
+
+const PAPER = '#e3d2a6';        // the sheet
+const PAPER_CURL = '#cdb887';   // where it turns away, and the flank of a roll
+const PAPER_EDGE = '#b08e5c';   // the cut edge of a rolled tube
+const ROLL_HOLE = '#63492c';    // straight down the middle of one
+const PAPER_MAP = '#dccb9e';    // the panel the city is drawn in
+const MAP_INK = '#4a3a24';      // the line on it, and the lettering
+const MAP_INK_LO = '#6f5a3a';   // the second line of lettering
+// `SCROLL.turn` is how much of the reference's shadow to believe, and the two
+// ends of it have both been on screen: 0 is flat paper, where the turn is
+// carried by the drawn edge alone and the sheet stops looking as though it
+// curves at all; 1 is the shadow at the strength the reference paints it,
+// which is a dark wedge reading as a second object rather than as one sheet
+// going round.  It is wanted faint.  Live, so it can be bisected while
+// looking at it: `PARTY.scrollTurn(0.2)`.
+const bandColors = () =>
+  [PAPER, lerpHex(PAPER, PAPER_CURL, SCROLL.turn), PAPER_EDGE, ROLL_HOLE];
+const SCROLL_SEED = 0x4d21;
+
+// The art never moves and never resizes, so its points are put into screen
+// coordinates once instead of ninety times a second.
+let scrollAt = null;
+function scrollPts(x, y, S, sq) {
+  if (scrollAt && scrollAt.x === x && scrollAt.y === y
+      && scrollAt.S === S && scrollAt.sq === sq) return scrollAt;
+  const P = ([u, v]) => [x + u * S * sq, y + v * S];
+  scrollAt = {
+    x, y, S, sq,
+    bands: SCROLL_ART.bands.map(band => band.map(loop => loop.map(P))),
+    edges: SCROLL_ART.edges.map(e => ({ closed: e.closed, band: e.band, pts: e.pts.map(P) })),
+  };
+  return scrollAt;
+}
+
+/**
+ * The paper.
+ *
+ * `S` is the art's long side in screen px and `sq` squeezes it horizontally.
+ * THE SQUEEZE IS NOT A FUDGE: the map is square, this design is landscape,
+ * and the scroll has to be scaled off its HEIGHT to fit the map on it - which
+ * leaves the clean part of the sheet far wider than the map needs and a strip
+ * of bare paper either side of the drawing.  So the art is narrowed until its
+ * clean part is the width the map actually wants.  It only ever narrows, and
+ * the line is laid on afterwards in screen space, so nothing about the stroke
+ * is squashed with it.
+ *
+ * FILLING AND LINING ARE TWO DIFFERENT QUESTIONS, and keeping them apart is
+ * the whole reason this looks like the reference rather than like a trace of
+ * it.  Every region gets a flat colour; only the stretches of a boundary
+ * where the picture actually jumps get a line.  The turn into the roll is a
+ * change of colour with no line on it, because that is what a soft edge is.
+ * See the long note in preview/scroll-prep.py.
+ */
+function drawScroll(ctx, x, y, S, sq) {
+  const art = scrollPts(x, y, S, sq);
+  const BAND = bandColors();
+  for (let b = 0; b < art.bands.length; b++) {
+    ctx.fillStyle = BAND[b];
+    for (const loop of art.bands[b]) {
+      ctx.beginPath();
+      ctx.moveTo(loop[0][0], loop[0][1]);
+      for (let i = 1; i < loop.length; i++) ctx.lineTo(loop[i][0], loop[i][1]);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // The silhouette carries the object, so it gets the heavier line - the same
+  // rule the city uses, where a block's outline is the heaviest line on it.
+  const W = INK.weight, WB = INK.wobble * 0.5;
+  let seed = SCROLL_SEED;
+  for (const e of art.edges) {
+    inkPath(ctx, e.pts, e.band === 0 ? W * 1.15 : W * 0.75,
+            seed += 7, WB, MAP_INK, e.closed);
+  }
+}
 
 export function tipVotes(tips, city) {
   const votes = new Map();
@@ -633,37 +742,81 @@ function tipShade(n) {
 // Avenue from 12th once the avenues are not evenly spaced.
 function drawMinimap(ctx, game) {
   const { city, player, tips } = game;
-  const MAP = 160, pad = 8;
-  const size = MAP + pad * 2;
-  // two lines under the map now, so it sits high enough for both of them
-  const x = VIEW_W - size - 16, y = VIEW_H - size - 54;
-  panel(ctx, x, y, size, size + 38);
-  const S = MAP / WORLD;
-  const MX = (wx) => x + pad + wx * S;
-  const MY = (wy) => y + pad + wy * S;
+  // The sheet is laid out around the drawing, not the other way round: 160 of
+  // map, a left margin, then the strip on the right that the tall roll takes
+  // and the writing must not run into, and under it two lines of type with
+  // enough left over that the torn bottom edge does not bite into them.
+  // THE LAYOUT, WORKED BACKWARDS FROM THE PAPER.
+  // `SCROLL_ART.inner` is the biggest rectangle of plain sheet on the traced
+  // art - no roll on it, no turn, inside the torn edges - so the map is given
+  // the size it wants and the scroll is scaled until its clean part holds it.
+  // Nothing here is a number picked to look right against a drawing; move to
+  // a different scroll and the map still lands on the paper.
+  const MAP = 150, AIR = 13;                       // paper left round the map
+  const [IX, IY, IW, IH] = SCROLL_ART.inner;
+  const S = (MAP + AIR * 2) / IH;                  // the art's long side, in px
+  // ...and then taken in horizontally until the clean part is only as wide as
+  // the map needs.  Scaled off its height alone this design leaves 30-odd px
+  // of bare paper either side of the city, which reads as a sheet that has
+  // been stretched rather than one that fits.
+  const sq = Math.min(1, (MAP + AIR * 2) / (IW * S));
+  const sx = VIEW_W - 16 - SCROLL_ART.w * S * sq;
+  // The two lines of writing go UNDER the paper, not on it.  This design is
+  // landscape and its clean rectangle is wider than it is tall, so a square
+  // map and two lines of type will not both fit on it however it is scaled -
+  // and the map is the thing that must not shrink.  They get the dark outline
+  // the vitals already use, which is what the HUD does when it has no panel.
+  const sh = SCROLL_ART.h * S;
+  const sy = VIEW_H - 26 - 36 - sh;
+  drawScroll(ctx, sx, sy, S, sq);
+
+  // the map, centred in the clean part of the sheet
+  const x = sx + (IX + IW / 2) * S * sq - MAP / 2;
+  const y = sy + (IY + IH / 2) * S - MAP / 2;
+  const SC = MAP / WORLD;
+  const MX = (wx) => x + wx * SC;
+  const MY = (wy) => y + wy * SC;
 
   const { votes, max } = tipVotes(tips, city);
 
-  ctx.fillStyle = '#0d0c14';                       // the roads, underneath
-  ctx.fillRect(x + pad, y + pad, MAP, MAP);
+  // The city is inked ONTO the paper and the streets are simply not drawn:
+  // what runs between the blocks is the sheet showing through, which is how a
+  // drawn map works and is why there is no road on this one.
+  ctx.fillStyle = PAPER_MAP;
+  ctx.fillRect(x, y, MAP, MAP);
   for (const b of city.blocks) {
     const bx = MX(b.x0), by = MY(b.y0);
-    const bw = Math.max(1, (b.x1 - b.x0) * S - 1), bh = Math.max(1, (b.y1 - b.y0) * S - 1);
+    const bw = Math.max(1, (b.x1 - b.x0) * SC - 1), bh = Math.max(1, (b.y1 - b.y0) * SC - 1);
     ctx.fillStyle = tipShade(votes.get(b.id) || 0);
     ctx.fillRect(bx, by, bw, bh);
+    // A block whose doors have all been knocked is struck through in the same
+    // ink the map is drawn in - not in red.  Red on this sheet means one
+    // thing, and the one thing is you.  The strike is drawn OVER whatever
+    // shade the block has rather than washing it out, so crossing a block off
+    // never costs you the depth you read it at.
     if (b.doors.every(d => d.tried)) {
-      ctx.fillStyle = 'rgba(200,70,70,0.34)';
-      ctx.fillRect(bx, by, bw, bh);
-      ctx.strokeStyle = '#d0424a'; ctx.lineWidth = 1;
+      ctx.strokeStyle = MAP_INK; ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(bx + 1, by + 1); ctx.lineTo(bx + bw - 1, by + bh - 1);
       ctx.moveTo(bx + bw - 1, by + 1); ctx.lineTo(bx + 1, by + bh - 1);
       ctx.stroke();
     }
   }
-  // player
-  ctx.fillStyle = '#ffd24a';
-  ctx.fillRect(MX(player.x) - 2, MY(player.y) - 2, 5, 5);
+  // the border of the drawing, cut by hand like everything else
+  inkPoly(ctx, [[x, y], [x + MAP, y], [x + MAP, y + MAP], [x, y + MAP]],
+          INK.weight * 0.6, SCROLL_SEED + 300, INK.wobble * 0.5,
+          INK.over * 0.4, MAP_INK, true);
+
+  // You, and the only red on the paper.  It was a gold pip when the map was a
+  // dark panel; gold on parchment is a stain.
+  const px = MX(player.x), py = MY(player.y);
+  ctx.fillStyle = BLOOD_RED;
+  ctx.beginPath();
+  ctx.arc(px, py, 3.2, 0, 6.2832);
+  ctx.fill();
+  ctx.strokeStyle = MAP_INK;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
 
   // The map shows you where you are and what you have been told.  It does NOT
   // show you where the monsters are: the vision used to put a pinprick on each
@@ -673,16 +826,19 @@ function drawMinimap(ctx, game) {
 
   ctx.textAlign = 'center';
   ctx.font = FONT(11);
-  ctx.fillStyle = '#9a8ab8';
   // Not "doors left".  Nothing has been taken off the table: this is how many
   // people have said something and how far the shading gets you if they were
   // telling the truth, which they were not, half of them.
   const cap = !tips.length ? 'NOTHING BUT RUMOURS'
     : tips.length === 1 ? '1 TIP, 1 DEEP'
     : `${tips.length} TIPS, ${max} DEEP`;
-  ctx.fillText(cap, x + size / 2, y + size + 14);
-  ctx.fillStyle = '#7a6f92';
-  ctx.fillText(addressOf(blockAt(player.x, player.y)).toUpperCase(), x + size / 2, y + size + 30);
+  // under the paper rather than at the foot of the screen: two lines adrift in
+  // the corner read as somebody else's HUD, two lines under the scroll read as
+  // the scroll's caption
+  const mid = x + MAP / 2;
+  outlined(ctx, cap, mid, sy + sh + 18, PAPER, 11);
+  outlined(ctx, addressOf(blockAt(player.x, player.y)).toUpperCase(),
+           mid, sy + sh + 34, PAPER_CURL, 11);
 }
 
 // ---------------------------------------------------------------------------

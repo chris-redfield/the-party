@@ -158,6 +158,72 @@ export function inkEdge(ctx, x0, y0, x1, y1, weight, seed, edge, wobble, over = 
 }
 
 /**
+ * A WHOLE POLYLINE as one stroke of this line.
+ *
+ * `inkPoly` treats each pair of points as its own edge, which is right for a
+ * box or a goblet - six flats, six strokes, and the corners overshoot.  It is
+ * wrong for a shape that was traced rather than drawn: the scroll's
+ * silhouette is ninety-odd points, and ninety strokes with an overshoot at
+ * every joint comes out as a caterpillar rather than a line.
+ *
+ * So this runs ONE stroke along the lot.  The wander and the weight are
+ * carried on control points spaced by ARC LENGTH down the whole path, so a
+ * traced outline breathes over its length the way a drawn wall does, and the
+ * two banks of it are still independent - which is the thing that stops a
+ * wandering line reading as a computer imitating a hand.
+ *
+ * `close` joins the end back to the start.  The seam that leaves is a seam a
+ * hand leaves too.
+ */
+export function inkPath(ctx, pts, weight, seed, wobble, col, close = false) {
+  const P = close && pts.length > 2 ? pts.concat([pts[0]]) : pts;
+  const m = P.length;
+  if (m < 2) return;
+  const cum = [0];
+  for (let i = 1; i < m; i++) {
+    cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+  }
+  const L = cum[m - 1];
+  if (L < 1.5) return;
+  // one control point per ~40px of line, which is the wavelength the walls
+  // and the chalices are already drawn at
+  const n = Math.max(3, Math.min(28, Math.round(L / 40) + 2));
+  const off = [], wid = [];
+  for (let i = 0; i < n; i++) {
+    const ease = Math.sin((i / (n - 1)) * Math.PI);
+    off.push((hash2(seed, i * 7 + 1) - 0.5) * 2 * wobble * (close ? 1 : 0.35 + 0.65 * ease));
+    wid.push(0.62 + hash2(seed * 17 + 3, i * 13 + 5) * 0.85);
+  }
+  const at = (t, arr) => {
+    const f = Math.max(0, Math.min(1, t)) * (n - 1);
+    const i = Math.min(n - 2, Math.floor(f));
+    return arr[i] + (arr[i + 1] - arr[i]) * (f - i);
+  };
+  const bank = (side) => {
+    const out = [];
+    for (let i = 0; i < m; i++) {
+      const a = P[i === 0 ? (close ? m - 2 : 0) : i - 1];
+      const b = P[i === m - 1 ? (close ? 1 : m - 1) : i + 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1];
+      const tl = Math.hypot(tx, ty) || 1;
+      tx /= tl; ty /= tl;
+      const t = cum[i] / L;
+      const o = at(t, off), w = at(t, wid) * weight * 0.5;
+      out.push([P[i][0] - ty * (o + side * w), P[i][1] + tx * (o + side * w)]);
+    }
+    return out;
+  };
+  const A = bank(+1), B = bank(-1);
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(A[0][0], A[0][1]);
+  for (let i = 1; i < m; i++) ctx.lineTo(A[i][0], A[i][1]);
+  for (let i = m - 1; i >= 0; i--) ctx.lineTo(B[i][0], B[i][1]);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
  * A run of drawn edges through a list of points - a shape cut by hand.
  *
  * `col` matters more than it looks.  The city's ink is near-black because it

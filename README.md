@@ -263,10 +263,17 @@ what is hanging beside the door. Each one you are given is a playing card, and
 they stack up bottom left along the axis between you and the screen — newest
 lying face up on top, the ones underneath showing only their corner index, the
 way a deck does when it is not squared up. Until you have been given anything
-the deck is one card, face down. Click any card that is not already on top and
-it comes to the front, so you can read whichever one you need; and the deck
-stays up while a monster is talking to you, because that is the moment a card
-lands on it.
+the deck is one card, face down, **and that is all it is** — it used to stand
+four lines of instructions beside it (*nothing yet / find a cat / find a
+monster / believe half of it*) with a count of nought out of five underneath,
+which is the corner of the screen explaining the game at the one moment you
+are most likely to be looking at it. The face-down card says the whole of it:
+there is a deck, and there is nothing in it. The count comes back as soon as
+there is something to count, because from then on it is inventory — how many
+asks the night has left — rather than an instruction. Click any card that is
+not already on top and it comes to the front, so you can read whichever one
+you need; and the deck stays up while a monster is talking to you, because
+that is the moment a card lands on it.
 
 No two blocks share a south-west corner, so district + avenue + street lands
 you on exactly one block; the decoration then picks out which of that block's
@@ -302,7 +309,7 @@ off every door they excluded. It cannot do that now — with lies in the deck an
 honest intersection of everything you have been told is empty nine times in
 ten. So the map stops eliminating and starts **shading**: every tip colours in
 every block it would allow, the colours stack, and a block three tips agree on
-comes up hotter than a block only one mentioned. You read the overlap. A block
+comes up darker and redder than a block only one mentioned. You read the overlap. A block
 nothing has shaded is not a block that has been ruled out — it is a block
 nobody has mentioned.
 
@@ -619,9 +626,96 @@ drawn by hand — a drawing inside a widget rather than a drawing. They are gone
 the glasses and the clock stand straight on the street, and the words under
 them keep their footing on their own dark outline, the same answer the floating
 toasts already use and the same one every sprite in the game uses. Everything
-else on the HUD keeps its panel — the minimap, the deck of cards, the prompt,
-the speech box — because those are *pages of information* and a page wants an
-edge. `HUD_PANELS` in `src/config.js` puts the two boxes back.
+else on the HUD keeps its panel — the deck of cards, the prompt, the speech
+box — because those are *pages of information* and a page wants an edge. The
+minimap had one too until it became a scroll; see below. `HUD_PANELS` in `src/config.js` puts the two boxes back.
+
+**The map is a scroll, and the scroll is traced rather than drawn.** It was
+the third violet rectangle and the one with the most on it. Three goes at
+cutting a scroll freehand all came out as a beige rectangle with tubes stuck
+on it — the torn edges especially, which are fiddly and good in real scroll
+art and were terrible every time. So the shape comes off a piece of stock
+vector art and the *drawing* is ours.
+
+`preview/scroll-prep.py` does the taking:
+
+1. It rasterises the EPS with ghostscript — vector in, so there is no JPEG
+   ringing to fight — and cuts out the one design on the sheet we use.
+2. It splits the artwork into **four luminance bands**. This works because
+   the reference's gradients run *inside* its regions rather than across
+   them: the sheet runs 207–255 and is one band, the shaded turn is one, the
+   cut edge of a roll is one, and the dark down the middle of a rolled tube
+   is one. Quantising the *colours* to four would have laid contour lines
+   across the sheet; quantising into *regions* does not.
+3. It traces the outline of every region and simplifies it.
+4. **It then asks of every boundary whether it is a drawn edge or a shadow.**
+   This is the part that matters, and the first cut of the script got it
+   wrong: it filled all four bands and ran a line round each, which put a
+   hard edge and a dark wedge down the right of the sheet where the reference
+   has nothing but a soft shadow. The algorithm had faithfully traced the
+   airbrushing it existed to remove. **A drawn edge is a cliff; shading is a
+   slope** — so a boundary only earns a line along the stretches where the
+   luminance actually jumps. On this art the shading slopes at well under 3
+   levels per pixel and every real edge is over 30, so the threshold is not
+   a close call. The turn into the roll therefore arrives as a change of
+   colour with no line on it, which is what a soft edge is.
+5. It measures the biggest rectangle of plain sheet on the thing, and writes
+   the lot out as plain numbers in `src/scrollart.js` — about 6 kB of
+   coordinates, normalised 0–1. **No image ships**, and not one pixel of the
+   original's paint survives.
+
+`src/hud.js` then fills those regions in the HUD's parchment colours and runs
+`inkPath` round every one of them, so what is on screen is the reference's
+shape in this game's hand: flat masses, a drawn line, no airbrush anywhere.
+
+`inkPath` (`src/ink.js`) exists for exactly this. `inkPoly` treats every pair
+of points as its own edge, which is right for a box or a goblet — six flats,
+six strokes, corners overshooting. It is wrong for a shape that was traced:
+the silhouette is ninety-odd points, and ninety strokes with an overshoot at
+every joint comes out as a caterpillar. `inkPath` runs **one** stroke along
+the whole polyline, carrying the wander and the weight on control points
+spaced by arc length, so a traced outline breathes over its length the way a
+drawn wall does.
+
+Two more things about the sheet:
+
+- **The paper is the streets.** Nothing draws a road. The blocks are inked
+  onto the sheet and what runs between them is paper showing through, which
+  is how a drawn map has always worked.
+- **The layout is worked backwards from the paper.** The prep script measures
+  the largest roll-free rectangle inside the torn edges and stores it as
+  `inner`; the HUD gives the map the size it wants and scales the whole
+  scroll until its clean part holds it. Nothing is a number picked to look
+  right against a particular drawing, so cropping a different design out of
+  the reference sheet cannot silently push the city off the paper. The two
+  lines of type go *under* the sheet, with the dark outline the vitals use:
+  this design is landscape and its clean rectangle is wider than it is tall,
+  so a square map and two lines will not both fit on it however it is scaled,
+  and the map is the thing that must not shrink.
+- **And then it is taken in horizontally.** Scaled off its height alone, a
+  landscape sheet leaves thirty-odd pixels of bare paper either side of a
+  square map, which reads as a sheet that has been stretched rather than one
+  that fits. So the art is narrowed until its clean part is only as wide as
+  the map wants. It only ever narrows, and the line is laid on afterwards in
+  screen space, so nothing about the stroke is squashed with it.
+- **`SCROLL.turn` is how much of the reference's shadow to believe**, and
+  both ends of it have been on screen. 0 is flat paper, where the turn is
+  carried by the drawn edge alone and the sheet stops looking as though it
+  curves at all; 1 is the shadow at the strength the reference paints it,
+  which reads as a second object lying on the map rather than as one sheet
+  going round. It wants to be faint. `PARTY.scrollTurn(0.2)` turns it live.
+
+The source art is `assets/ON5YU51.eps`, and only the prep script ever reads
+it — nothing at runtime does.
+
+The shading ramp moved with it, from violet to a wash of ink and iron-gall
+red: same five absolute steps, same rule, spaced in lightness so a depth of
+three is still one colour you learn to recognise on a glance. Two things
+changed meaning on the way. **A block you have knocked out is struck through
+in the map's own ink, not washed in red** — it is drawn over the shade rather
+than replacing it, so crossing a block off never costs you the depth you were
+reading it at. And **red now means exactly one thing on that sheet, which is
+you**: the gold pip that marked you on the dark panel is a stain on parchment.
 
 ### The hourglass
 
@@ -977,6 +1071,8 @@ src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
 src/hourglass-pixel.js  the older pixel-art cut of it, kept for the A/B
+src/scrollart.js    GENERATED - the minimap scroll's outlines, traced off
+                    stock art by preview/scroll-prep.py
 src/label.js        the studio's label, which is the first thing on screen
 src/intro.js        the drawn intro, and the line he says over it
 src/bats.js         the room behind the right door: the clip that plays
@@ -1182,6 +1278,7 @@ PARTY.bench()      // ms a frame of city costs
 PARTY.glass(false)       // the old pixel-art hourglass; true for the drawn one
 PARTY.glass({wobble: 2.5})   // ...or turn one dial of its line
 PARTY.backWindows(true)  // put the windows back on the back building's roof
+PARTY.scrollTurn(0.2)    // how much shadow the map's scroll keeps, 0..1
 PARTY.skylights(true)    // put the glass back in the roofs
 PARTY.menu(1, 0.06)      // light a way in and pin its punch, to look at it
 PARTY.intro(8)     // replay the intro, at eight drawings a second

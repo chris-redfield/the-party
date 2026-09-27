@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, GLASS, BACK_WINDOWS, SKYLIGHTS, END, MENU, MENU_POP, INTRO } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, GLASS, SCROLL, BACK_WINDOWS, SKYLIGHTS, END, MENU, MENU_POP, INTRO } from './config.js';
 import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
@@ -295,6 +295,11 @@ window.PARTY = {
    * why they had to go.  Nothing else moves: the roll behind them is still
    * made either way, so no other window in the city changes.
    */
+  /**
+   * How much of the stock art's shadow survives where the map rolls up.
+   * 0 is flat paper and the drawn edge alone, 1 is the reference's own wedge.
+   */
+  scrollTurn(v) { if (v !== undefined) SCROLL.turn = v; return SCROLL.turn; },
   backWindows(on) { BACK_WINDOWS.on = !!on; return BACK_WINDOWS.on; },
   /**
    * A/B for the glass in the roofs.  `PARTY.skylights(true)` puts them back.

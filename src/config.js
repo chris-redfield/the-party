@@ -167,6 +167,14 @@ export const HUD_PANELS = false;
 // `PARTY.backWindows(true)`.  Giving the block a real back would mean folding
 // the north wall UP, above the roofline and into the road behind it, which is
 // a different city.
+// The minimap's scroll, which is traced off stock art (preview/scroll-prep.py)
+// and drawn in the city's line.  `turn` is how much of the reference's own
+// airbrushed shadow to keep where the sheet rolls up: 0 leaves flat paper and
+// the drawn edge alone, 1 is the wedge the reference paints, and the whole
+// argument for the number in between is written where it is used, in
+// src/hud.js.  Live: `PARTY.scrollTurn(0.2)`.
+export const SCROLL = { turn: 0.4 };
+
 export const BACK_WINDOWS = { on: false };
 
 // The glass in a roof.  Not a geometry mistake the way the north face was - a
