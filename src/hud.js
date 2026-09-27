@@ -7,7 +7,7 @@ import { DISTRICTS, blockAt } from './city.js';
 import { shortFact, cardFact, addressOf, claimedIds, FACT_KEYS } from './hints.js';
 // the red the cat's gift pours down the screen, which is the red you dry into
 import { BLOOD_RED } from './render.js';
-import { deathText, setDeathFont } from './deathtype.js';
+import { deathText, setDeathFont, deathFontsSettled } from './deathtype.js';
 
 const FONT = (px, bold = true) =>
   `${bold ? 'bold ' : ''}${px}px "Courier New", ui-monospace, monospace`;
@@ -518,58 +518,140 @@ export function drawPause(ctx) {
             VIEW_W / 2, VIEW_H / 2 + 88, 26);
 }
 
+// ---------------------------------------------------------------------------
+// The title card
+// ---------------------------------------------------------------------------
+// The same card the night ends on: flat blood red, edge to edge, and
+// everything on it cut out of that red in black, in the one face the game
+// owns.  It used to be the last screen still set in the HUD's mono over a
+// purple glow, which made the first thing anybody saw the one thing in the
+// game that did not look like the game.
+//
+// **Nothing on it is a fixed size.**  The word is fitted to the width it is
+// allowed, and the block of instructions is fitted to whatever room is left
+// between the tagline and the ENTER line - measured, not guessed - so editing
+// the lines below cannot push anything off the bottom of the screen or out
+// past the right-hand edge.  Add a line and the whole block gets slightly
+// smaller; take the longest one out and it gets slightly bigger.  The numbers
+// underneath are where the card is laid out, and they are the only things to
+// touch when it wants moving.
+//
+// One thing the face decides for us: **its hyphen sits on the baseline**, so
+// `A - B` sets as `A _ B` and reads as an underscore.  Every dash on this card
+// is a middle dot instead, and the two hyphenated words went to `trick or
+// treaters`, which is the one place the typeface got a say in the writing.
+// (The pause card still has its dashes, and they have the same problem.)
+const TITLE_W = 620;                    // how wide the word may get
+const TITLE_TOP = 40;                   // air above the tips of the letters
+const TAG_SIZE = 25, TAG_GAP = 46;      // the line under it, and its drop
+const COL_W = 556;                      // each block's width
+const COL_L = 56, COL_R = VIEW_W - 56 - COL_W;
+const BODY_GAP = 58;                    // between the tagline and the blocks
+const BODY_FOOT = 58;                   // and the air kept over the ENTER line
+const BODY_MAX = 28;                    // never bigger than this, however few
+const BODY_PITCH = 1.2;                 // line spacing, as a fraction of size
+const BODY_SPLIT = 0.6;                 // the gap between one entry and the next
+const BODY_INDENT = 0.9;                // how far the lines sit under their key
+const ENTER_SIZE = 30, ENTER_BASE = VIEW_H - 38;
+
+// Two blocks: what you do on the left, what is going on out there on the
+// right.  A key stands at the block's own edge and its lines are indented
+// under it - the mono card put the key in a column of its own down the middle
+// of the screen, which there is no room for once there are two of them.
+const TITLE_LEFT = [
+  ['MOVE', ['WASD / ARROWS  \u00b7  sidewalks and crosswalks only']],
+  ['BAT FORM', ['SPACE  \u00b7  fly over the trick or treaters. costs NIGHT,',
+                'and when the NIGHT runs dry it costs BLOOD instead']],
+  ['KNOCK / TALK', ['E  \u00b7  wrong door means candy, and candy means children']],
+  ['DUMP CANDY', ['Q  \u00b7  drop the bag, lose the tail']],
+];
+const TITLE_RIGHT = [
+  ['BLACK CATS', [`WALK INTO ONE  \u00b7  ${VISION_SECONDS} SECONDS of VAMPIRE VISION.`,
+                  'the living go grey, the lamps turn out to be torches,',
+                  'and the monsters stop looking like somebody\'s kid.',
+                  'the cats go with it.']],
+  ['THE POINT', ['only monsters know where the party is, and out here',
+                 'they are dressed as trick or treaters like everybody else.']],
+  ['THE CATCH', ['five tips a night, and half of them are lies. a liar',
+                 'sounds like everybody else. a tip is a claim, not a fact:',
+                 'the map shades where claims agree, and crosses off nothing.']],
+];
+
+/** The biggest `start` will go without `text` running past `maxW`. */
+function fitTo(ctx, text, maxW, start) {
+  setDeathFont(ctx, start);
+  const w = ctx.measureText(text).width;
+  return w > maxW ? start * (maxW / w) : start;
+}
+
 export function drawTitle(ctx, t) {
-  ctx.fillStyle = '#0a0812';
+  ctx.fillStyle = BLOOD_RED;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  const g = ctx.createRadialGradient(VIEW_W / 2, VIEW_H * 0.34, 20, VIEW_W / 2, VIEW_H * 0.34, 480);
-  g.addColorStop(0, 'rgba(120,60,200,0.35)');
-  g.addColorStop(1, 'transparent');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.fillStyle = '#000000';
 
-  ctx.textAlign = 'center';
-  ctx.font = FONT(74);
-  ctx.fillStyle = '#f0e2ff';
-  ctx.fillText('THE PARTY', VIEW_W / 2, 190);
-  ctx.font = FONT(17, false);
-  ctx.fillStyle = '#c9a8ff';
-  ctx.fillText('the monsters only get one night, and you lost the invitation', VIEW_W / 2, 224);
+  // The red goes up straight away and the words wait for the face.  Every
+  // frame of this card is redrawn, so setting it before the font lands does
+  // not leave Times on the screen - it leaves Times on the screen for a
+  // moment and then snaps into the real face, which is the sort of thing you
+  // cannot un-see once you have seen it.  A flat red field for the same
+  // moment reads as the card arriving.  See deathFontsSettled(): this waits
+  // on the answer, not on success, so a font that never comes still gets its
+  // card, in whatever the fallback is.
+  if (!deathFontsSettled()) return;
 
-  const lines = [
-    ['MOVE', 'WASD / ARROWS  -  sidewalks and crosswalks only'],
-    ['BAT FORM', 'SPACE  -  fly over the trick-or-treaters. costs NIGHT,'],
-    ['', 'and when the NIGHT runs dry it costs BLOOD instead'],
-    ['KNOCK / TALK', 'E  -  wrong door means candy, and candy means children'],
-    ['DUMP CANDY', 'Q  -  drop the bag, lose the tail'],
-    ['', ''],
-    ['BLACK CATS', `WALK INTO ONE  -  ${VISION_SECONDS} SECONDS of VAMPIRE VISION.`],
-    ['', 'the living go grey, the lamps turn out to be torches, and'],
-    ['', 'the monsters stop looking like somebody\'s kid. the cats go.'],
-    ['', ''],
-    ['THE POINT', 'only monsters know where the party is, and out here they'],
-    ['', 'are dressed as trick-or-treaters like everybody else.'],
-    ['', ''],
-    ['THE CATCH', 'five tips a night, and half of them are lies. a liar'],
-    ['', 'sounds like everybody else. a tip is a claim, not a fact:'],
-    ['', 'the map shades where claims agree, and crosses off nothing.'],
-  ];
-  ctx.font = FONT(16);
-  let y = 278;
-  for (const [k, v] of lines) {
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#b08aff';
-    ctx.fillText(k, VIEW_W / 2 - 150, y);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ddd2ee';
-    ctx.font = FONT(16, false);
-    ctx.fillText(v, VIEW_W / 2 - 132, y);
-    ctx.font = FONT(16);
-    y += 24;
+  // The word is hung off the top of its own ink rather than off a baseline
+  // somebody guessed: this face throws spikes well above its cap height, and
+  // a baseline that looks right at one size shaves the tips off at the next.
+  const big = fitTo(ctx, 'THE PARTY', TITLE_W, 170);
+  setDeathFont(ctx, big);
+  const asc = ctx.measureText('THE PARTY').actualBoundingBoxAscent || big * 0.95;
+  const titleBase = TITLE_TOP + asc;
+  deathText(ctx, 'THE PARTY', MID, titleBase, big);
+
+  const tag = 'the monsters only get one night, and you lost the invitation';
+  const tagBase = titleBase + TAG_GAP;
+  deathText(ctx, tag, MID, tagBase, fitTo(ctx, tag, VIEW_W - 120, TAG_SIZE));
+
+  // everything below the tagline is measured off it, so the card cannot close
+  // up on itself when the word above changes size
+  const top = tagBase + BODY_GAP, bottom = ENTER_BASE - BODY_FOOT;
+
+  // One size for both blocks, and it is whichever is smaller: the size at
+  // which the longest line still fits its block, or the size at which the
+  // taller block still fits the height.  Both blocks take it, so the two read
+  // as one card rather than as two.
+  let size = BODY_MAX;
+  for (const [key, lines] of [...TITLE_LEFT, ...TITLE_RIGHT]) {
+    size = Math.min(size, fitTo(ctx, key, COL_W, BODY_MAX));
+    for (const l of lines) {
+      size = Math.min(size, fitTo(ctx, l, COL_W - BODY_MAX * BODY_INDENT, BODY_MAX));
+    }
   }
-  ctx.textAlign = 'center';
-  ctx.font = FONT(22);
-  ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffd24a' : '#a07ad8';
-  ctx.fillText('PRESS ENTER - MIDNIGHT IS WASTING', VIEW_W / 2, VIEW_H - 64);
+  const steps = (block) => block.reduce((n, [, l]) => n + 1 + l.length + BODY_SPLIT, 0)
+    - BODY_SPLIT - 1;
+  size = Math.min(size, (bottom - top) / (Math.max(steps(TITLE_LEFT), steps(TITLE_RIGHT)) * BODY_PITCH));
+
+  const block = (entries, x) => {
+    let y = top;
+    for (const [key, lines] of entries) {
+      deathText(ctx, key, x, y, size, 'left');
+      y += size * BODY_PITCH;
+      for (const l of lines) {
+        deathText(ctx, l, x + size * BODY_INDENT, y, size, 'left');
+        y += size * BODY_PITCH;
+      }
+      y += size * BODY_PITCH * BODY_SPLIT;
+    }
+  };
+  block(TITLE_LEFT, COL_L);
+  block(TITLE_RIGHT, COL_R);
+
+  // It blinks by being there and then not being there, which is how the end
+  // card's line blinks.  Two colours taking turns was the mono card's trick
+  // and there is only one colour on this one.
+  if (Math.floor(t * 2) % 2) {
+    deathText(ctx, 'PRESS ENTER \u00b7 MIDNIGHT IS WASTING', MID, ENTER_BASE, ENTER_SIZE);
+  }
 }
 
 // Every night ends on the same card now - the two ways of losing and the one

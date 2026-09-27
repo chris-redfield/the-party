@@ -16,11 +16,18 @@ const URL = 'assets/deathly/Font1.otf';
 const SCALE = 1;             // measured at 100px: cap 87, H 49.7 wide
 
 let ready = false;
+let settled = false;
 
 /**
  * Pulled in over the FontFace API rather than declared in the stylesheet, so
  * there is a promise to wait on: canvas text does not re-draw itself when a
  * font turns up late, it just silently sets in the fallback and stays there.
+ * On a screen that redraws every frame it does correct itself - which is
+ * worse, not better, because what you see is the title card set in Times for
+ * a moment and then jumping into the real face.  So the title card waits, and
+ * `settled` is what it waits on: **it is true when the face has arrived AND
+ * when it is never going to**, so a missing font costs a moment and then sets
+ * in the fallback rather than leaving a blank red screen for ever.
  */
 export async function loadDeathFonts() {
   try {
@@ -30,10 +37,13 @@ export async function loadDeathFonts() {
     ready = true;
   } catch (e) {
     console.warn(`death type: ${URL} did not load`, e);
+  } finally {
+    settled = true;
   }
 }
 
 export const deathFontsReady = () => ready;
+export const deathFontsSettled = () => settled;
 
 export function setDeathFont(ctx, size) {
   ctx.font = `${Math.round(size * SCALE)}px "${FAMILY}", "Times New Roman", serif`;

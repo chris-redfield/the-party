@@ -211,8 +211,10 @@ want it.
 
 It is set in **Deathly**, the only real typeface in the game — everything
 else, down to the hourglass, is drawn out of code. It is not only on the end
-cards any more: the same face sets the word **PAUSED**, in the game's red over
-the stopped street, and every one of the floating lines the game throws up
+cards any more: **the title card is the same card the night ends on** — flat
+blood red edge to edge, every word on it cut out of that red in black, in this
+one face — and the same face sets **PAUSED** in the game's red over the stopped
+street, and every one of the floating lines the game throws up
 while you play — the tip landing, the candy, the child walking into you. Those
 keep their own colours, because what happened is in the colour, and they are
 stroked with the same dark outline every sprite in the game has, since a face
@@ -223,6 +225,39 @@ its licence, and is loaded over the FontFace API rather than declared in the
 stylesheet, because canvas text does not redraw itself when a font arrives
 late: it sets in the fallback and stays there. `DEATH_SIZE` in `src/hud.js`
 is how big the word goes.
+
+One thing the face decides for us: **its hyphen sits down on the baseline**, so
+`A - B` sets as `A _ B` and reads as an underscore. The title card uses a middle
+dot for every dash, and its two hyphenated words became `trick or treaters` —
+the one place the typeface got a say in the writing. The pause card still has
+plain dashes and still has the problem.
+
+The card is **two blocks**: what you do on the left, what is going on out
+there on the right. A key stands at its block's own edge with its lines
+indented under it — the old card put the keys in a single column down the
+middle of the screen, and there is no room for that once there are two of
+them.
+
+Nothing on it is a fixed size. The word is fitted to the width it is allowed
+and hung off the top of its own ink (this face throws spikes well above its
+cap height, so a baseline that looks right at one size shaves the tips off at
+the next), and everything below is measured off it. **Both blocks take the
+same size**, whichever is smaller of the size at which the longest line still
+fits its block and the size at which the taller block still fits the height —
+so the two read as one card rather than as two. Editing the lines cannot push
+anything off the screen; add one and everything gets slightly smaller.
+
+**The red goes up before the lettering does.** The card is redrawn every
+frame, so setting it before the face arrives does not leave Times on the
+screen — it leaves Times on the screen for a moment and then snaps into the
+real face, which is worse. So the field is filled immediately and the words
+wait on `deathFontsSettled()`, which is true when the font has arrived *and*
+when it is never going to: a font that fails still gets its card, in the
+fallback, rather than leaving a blank red screen for ever. The face is also
+asked for in `index.html` with a `<link rel="preload">`, so the fetch starts
+with the page instead of waiting for `main.js` to run and ask. Proved with the
+font load deliberately slowed to three seconds: at 1.5 s the card is a flat
+red field with not one black pixel on it, and at 5 s it is fully set.
 
 > **Licence:** Deathly is 1001Fonts *Free For Personal Use*. That does not
 > cover commercial use — releasing this for money needs a licence from the
