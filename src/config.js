@@ -61,8 +61,14 @@ export const PLOT_DEEP = 208;          // shallowest building
 export const PLOT_DEEP_MAX = 430;
 export const PLOT_STOP = 0.18;
 // Each building carries its own height, so a block of them has a skyline.
-export const WALL_MIN = 72;
-export const WALL_MAX = 108;
+// Raised 20% from 72/108: the old facades were short enough that a two-storey
+// front had nowhere to put the upper row of windows except on top of the
+// door, and a taller wall gives the whole row somewhere to go.  Note this is
+// only HALF the fix - see TWO_ROW_MIN in scenery.js for why height alone
+// cannot do it (at +20% a third of the doors still clashed, and the height
+// that did clear it on its own made every building in the city two-storey).
+export const WALL_MIN = 86;
+export const WALL_MAX = 130;
 
 // Road width by depth of the cut: the first cuts are avenues the height of
 // the city, the last are lanes a block and a half long.

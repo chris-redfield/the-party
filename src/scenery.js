@@ -853,6 +853,39 @@ function drawDeco(ctx, kind, sx, sy, z) {
 // ---------------------------------------------------------------------------
 // Doors
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// HOW TALL A FACADE HAS TO BE TO HOLD A DOOR AND TWO ROWS OF WINDOWS
+// ---------------------------------------------------------------------------
+// These were loose numbers in two different functions, and that is exactly
+// how the door ended up drawn through the first-floor windows: `drawDoor`
+// knew the door was 54 tall with a 9px lintel over it, `drawPlot` knew the
+// upper row of windows hangs 38 down from the top of the wall, and nothing
+// anywhere knew that a wall shorter than the sum of those cannot have both.
+//
+// So they are named here, once, and the rule is DERIVED from them.  Change
+// the door's height and the window rule follows it; that is the whole point
+// of the constant.
+const DOOR_H = 54;            // the leaf itself
+const DOOR_LINTEL = 9;        // the stone over it, which is what actually hit
+const WIN_H = 26;             // the drawn window cell
+const WIN_PITCH = 32;         // storey to storey
+const WIN_HEAD = 8;           // wall left above the topmost row
+// How far the ground row's head sits above the door's head.  The door is
+// what the row is hung off, so this is the number that decides whether the
+// windows look like they belong beside the door or above it.
+const WIN_RISE = 16;
+
+/**
+ * Shorter than this and a facade gets ONE row of windows.
+ *
+ * Note what this is NOT any more: it is not "the height at which the door
+ * stops hitting the upper row".  The rows are hung off the pavement now, so
+ * the door cannot hit them at any height - see the note in `drawPlot`.  All
+ * this asks is whether a SECOND row fits under the parapet once the ground
+ * row has taken its place beside the door.
+ */
+export const TWO_ROW_MIN = DOOR_H + WIN_RISE + WIN_PITCH + WIN_HEAD;   // 110
+
 function drawDoor(ctx, door, o) {
   const { ox, oy, z } = o;
   const col = COLOR_DOORS ? door.color : { hex: '#4a4a4a', trim: '#606060' };
@@ -862,7 +895,7 @@ function drawDoor(ctx, door, o) {
   // a short building gets a short door, so the lintel over it stays on the
   // wall instead of climbing onto the roof behind
   const wallH = door.plot ? door.plot.wallH : 88;
-  const dw = 36 * z, dh = Math.min(54, wallH - 12) * z;
+  const dw = 36 * z, dh = Math.min(DOOR_H, wallH - 12) * z;
   const dx = px - dw / 2, dy = py - dh;
 
   const ID = INK.on;
@@ -935,12 +968,12 @@ function drawDoor(ctx, door, o) {
 
   // a lintel over the opening
   ctx.fillStyle = C.ledge;
-  ctx.fillRect(dx - 8 * z, dy - 9 * z, dw + 16 * z, 4 * z);
+  ctx.fillRect(dx - 8 * z, dy - DOOR_LINTEL * z, dw + 16 * z, 4 * z);
   if (!ID) {
     ctx.fillStyle = C.coreShadow;
     ctx.fillRect(dx - 8 * z, dy - 5 * z, dw + 16 * z, 1.5 * z);
   } else {
-    inkBox(ctx, dx - 8 * z, dy - 9 * z, dw + 16 * z, 4 * z, INK.weight * z * 0.7,
+    inkBox(ctx, dx - 8 * z, dy - DOOR_LINTEL * z, dw + 16 * z, 4 * z, INK.weight * z * 0.7,
            (door.plot ? door.plot.seed : 7) + 55, INK.wobble * z * 0.7, INK.over * z * 0.6, '', z);
   }
 
@@ -1235,6 +1268,25 @@ function drawPlot(ctx, plot, block, o, t) {
 
   // --- the front wall -----------------------------------------------------
   const fy = y1 - wallH;
+
+  // --- where the windows will go, worked out BEFORE anything is drawn -----
+  // The facade's horizontal lines have to agree with the windows, so the
+  // windows' geometry cannot be decided halfway down the function after the
+  // lines have already been laid.  This is the whole layout in four numbers.
+  const rows = wallH >= TWO_ROW_MIN ? 2 : 1;
+  const doorTop = y1 - Math.min(DOOR_H, wallH - 12);
+  // the ground row's head, tied to the door's head - kept off the parapet at
+  // the top and off the plinth at the bottom on the shortest walls
+  const groundTop = Math.min(y1 - 12 - WIN_H,
+                             Math.max(fy + WIN_HEAD, doorTop - WIN_RISE));
+  // A STRING COURSE IS THE LINE BETWEEN TWO STOREYS.  A one-storey front has
+  // no two storeys, so it does not get one - and that is not a cosmetic
+  // choice, it is the only place the line could go.  On a single-row facade
+  // the only horizontal band not already spoken for is the window heads
+  // themselves, which is exactly where it was landing and why it looked
+  // wrong.  On a two-row front it goes in the gap BETWEEN the rows, centred,
+  // which is the one place on the wall that is guaranteed to be empty.
+  const courseY = rows > 1 ? groundTop - (WIN_PITCH - WIN_H) / 2 : null;
   ctx.fillStyle = C.wallTop;                    // parapet over the facade
   ctx.fillRect(X(x0), Y(fy - 10), w, 10 * z);
   if (!ID) {                                    // its shadowed underside
@@ -1250,11 +1302,11 @@ function drawPlot(ctx, plot, block, o, t) {
 
   // a string course between the storeys.  Drawn, it is one line and not a
   // lit edge over a dark one - the ink pass below puts it in.
-  if (!ID) {
+  if (!ID && courseY !== null) {
     ctx.fillStyle = C.ledge;
-    ctx.fillRect(X(x0), Y(fy + 40), w, 3 * z);
+    ctx.fillRect(X(x0), Y(courseY - 1.5), w, 3 * z);
     ctx.fillStyle = C.coreShadow;
-    ctx.fillRect(X(x0), Y(fy + 43), w, 2 * z);
+    ctx.fillRect(X(x0), Y(courseY + 1.5), w, 2 * z);
   }
 
   // the plinth the whole thing stands on: the flat band stays, the hard
@@ -1292,21 +1344,44 @@ function drawPlot(ctx, plot, block, o, t) {
     inkLine(ctx, X(x0), Y(fy - 10), X(x1), Y(fy - 10), IW * 1.15, sd, 4, IB, IO, z);
     // where the front wall starts, behind the parapet cap
     inkLine(ctx, X(x0), Y(fy), X(x1), Y(fy), IW * 0.8, sd, 5, IB * 0.7, IO * 0.5, z);
-    // the string course between the storeys, and the plinth at the bottom
-    inkLine(ctx, X(x0), Y(fy + 41), X(x1), Y(fy + 41), IW * 0.7, sd, 6, IB * 0.8, IO * 0.6, z);
+    // the string course, if this building has two storeys to divide.  Thin
+    // and barely wobbling: it has 6px of clear wall to live in and the line's
+    // own wander is most of that.
+    if (courseY !== null)
+      inkLine(ctx, X(x0), Y(courseY), X(x1), Y(courseY), IW * 0.55, sd, 6, IB * 0.35, IO * 0.4, z);
     inkLine(ctx, X(x0), Y(y1 - 12), X(x1), Y(y1 - 12), IW * 0.9, sd, 7, IB * 0.8, IO * 0.7, z);
   }
 
+  // --- WINDOWS HANG OFF THE PAVEMENT, NOT OFF THE ROOFLINE ----------------
+  // This is the whole fix, and getting it wrong twice is what made the door
+  // punch through a window.  The rows used to be measured DOWN from the top
+  // of the wall (`fy + 14 + r * 32`), while the door was measured UP from the
+  // street.  Two opposite anchors on the same wall means the gap between them
+  // is whatever the wall's height happens to leave over - so on some facades
+  // the door's head landed in a window and on others it did not, which is
+  // exactly the "only some buildings" this showed up as.
+  //
+  // It bit twice, in two different disguises:
+  //   - on a TWO-row front, the upper row came down onto the door's lintel;
+  //   - on a ONE-row front, the single row floated high under the parapet
+  //     with a blank wall beneath it, so it read as a second storey and the
+  //     door's head pushed up into it.  Same cause, and fixing only the first
+  //     one left the second looking just as wrong.
+  //
+  // Now the GROUND row is hung off the door itself - the thing it has to
+  // agree with - and any row above stacks up from there.  The clearance
+  // between the door's lintel and the row above is then a constant that no
+  // wall height can eat into: WIN_RISE - DOOR_LINTEL + (WIN_PITCH - WIN_H).
   const PITCH = 46, WINW = 30;
   const cols = Math.max(1, Math.floor((cw - 8 - WINW) / PITCH) + 1);
-  const rows = Math.max(1, Math.min(2, Math.floor((wallH - 52) / 32) + 1));
   const span = (cols - 1) * PITCH + WINW;
   const first = x0 + (cw - span) / 2;
   const doorX = (x0 + x1) / 2;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const wx = Math.round(first + c * PITCH);
-      const wy = fy + 14 + r * 32;
+      // r counts down from the top, so the ground row is the last one
+      const wy = groundTop + 2 - (rows - 1 - r) * WIN_PITCH;
       // the door lives in the bottom row.  The gap kept for it is the door
       // and its frame and no more - on a narrow frontage a wider gap takes
       // out every window on the wall and leaves a house that is all door.
