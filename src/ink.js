@@ -158,6 +158,25 @@ export function inkEdge(ctx, x0, y0, x1, y1, weight, seed, edge, wobble, over = 
 }
 
 /**
+ * A run of drawn edges through a list of points - a shape cut by hand.
+ *
+ * `col` matters more than it looks.  The city's ink is near-black because it
+ * is drawn on lit walls; a thing standing on the HUD's own dark ground needs
+ * the opposite end of the scale or it disappears - same wobble, same varying
+ * weight, same overshoot, but a LIGHT line.  It is chalk instead of ink, and
+ * it is the same hand.  The chalices and the hourglass are both drawn in it.
+ */
+export function inkPoly(ctx, pts, weight, seed, wobble, over, col, close = false) {
+  ctx.fillStyle = col;
+  const n = pts.length;
+  const last = close ? n : n - 1;
+  for (let i = 0; i < last; i++) {
+    const a = pts[i], b = pts[(i + 1) % n];
+    inkEdge(ctx, a[0], a[1], b[0], b[1], weight, seed, i, wobble, over, 1);
+  }
+}
+
+/**
  * A drawn box: four edges that do not quite meet, which is the whole point.
  *
  * `edge` seeds which of the four this is, so the same building's four walls

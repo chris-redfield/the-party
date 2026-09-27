@@ -114,7 +114,6 @@ export const VISION_FADE = 1.2;        // seconds to bleed IN at the start
 // torches gutter, the monsters sink back into the crowd.  At zero you are all
 // the way back to ordinary sight.
 export const VISION_TAPER = 0.30;
-export const VISION_WARN = VISION_SECONDS * VISION_TAPER;   // HUD starts flashing
 // The cat's gift arrives as blood running down the screen: it pours in from
 // the top on dripping runs, covers everything for a beat, and then slides off
 // the bottom - and the city changes as it goes, not behind it.
@@ -147,9 +146,30 @@ export const CAT_TOUCH = 26;           // walk this close and the cat does it
 // --- the hourglass ----------------------------------------------------------
 // The clock is not a clock.  It is an hourglass with the moon in the top bulb
 // and the sun in the bottom, and the same sand makes one out of the other.
-export const GLASS_UNIT = 4;          // px per art pixel of the hourglass
+export const GLASS_UNIT = 4;          // px per unit of the hourglass's own grid
 // The digits are gone on purpose.  Set true to put a readout back under it.
 export const GLASS_CLOCK_TEXT = false;
+
+// The dark violet-edged box that used to sit behind the two chalices and
+// behind the hourglass.  Everything else on the HUD - the minimap, the deck,
+// the prompt, the speech - keeps its panel; those are pages of information and
+// a page wants an edge.  The vitals and the clock are DRAWINGS, and a drawing
+// in a rectangle is a widget.  Set true to put the two boxes back.
+export const HUD_PANELS = false;
+
+// --- how the hourglass is drawn ---------------------------------------------
+// `ink: false` puts the old flat pixel-art hourglass back (src/hourglass-pixel
+// .js) so the two can be looked at side by side - evaluation furniture, and it
+// comes out once this is settled.  The rest are the drawn line's dials, sized
+// for an object this small: the city's own INK numbers are cut for walls two
+// hundred px long and come out clownish on a 124px clock.
+// Live, from the console: `PARTY.glass(false)`, `PARTY.glass({wobble: 2})`.
+export const GLASS = {
+  ink: true,
+  weight: 1.9,      // screen px - a shade lighter than the chalices' 1.95
+  wobble: 1.0,      // how far the stroke wanders off true
+  over: 1.7,        // how far a corner runs past its neighbour
+};
 
 // The end of a night is one phrase on a flat red field and nothing else - no
 // prose, no tally of how it went.  Set true to put the stats back under it.

@@ -424,7 +424,7 @@ street, and every one of the floating lines the game throws up
 while you play — the tip landing, the candy, the child walking into you. Those
 keep their own colours, because what happened is in the colour, and they are
 stroked with the same dark outline every sprite in the game has, since a face
-this thin over a lit street needs it. The HUD proper — the bars, the cards,
+this thin over a lit street needs it. The HUD proper — the glasses, the cards,
 the minimap, the address — stays in the mono face: that is data, and data
 should not look like a horror poster. It lives in `assets/` with
 its licence, and is loaded over the FontFace API rather than declared in the
@@ -566,6 +566,28 @@ too, because the drawings are 01–11 and 13–23 with no 12, and a gap in a
 sequence is a thing every reader of it has to know about. `INTRO.frames` is
 how many there are, and the script prints it.
 
+**The street opens on one line: FIND THE PARTY!** It comes up as a floating
+toast, in the same face and the same place as every other thing the game says
+to you, on the first frame the controls are live — not when the night is
+built. Those are twenty seconds apart when the intro is on, and a line thrown
+at the wrong end of that gap is over before the street is on screen. It is
+`game.opened` in `src/game.js`, tripped by `updateGame`'s own first frame, so
+it needs no separate handling for the intro being switched off or for a
+restart: the first frame of `updateGame` *is* "you have control", every time.
+
+### What the HUD stands on
+
+**The vitals and the clock have no box behind them.** The two chalices and the
+hourglass used to sit in a dark violet-edged rectangle each, and those two
+rectangles were the only ruled edges left on a screen where everything else is
+drawn by hand — a drawing inside a widget rather than a drawing. They are gone:
+the glasses and the clock stand straight on the street, and the words under
+them keep their footing on their own dark outline, the same answer the floating
+toasts already use and the same one every sprite in the game uses. Everything
+else on the HUD keeps its panel — the minimap, the deck of cards, the prompt,
+the speech box — because those are *pages of information* and a page wants an
+edge. `HUD_PANELS` in `src/config.js` puts the two boxes back.
+
 ### The hourglass
 
 **There are no digits on the clock, because there is no clock.** The only thing
@@ -591,7 +613,35 @@ AM. In the last hour the glass starts to crack, the sun burns up from
 its red to a bright one, and the skull's eye sockets catch the light that is
 coming for you.
 
-`GLASS_UNIT` in `src/config.js` is how big one of its art pixels is, and
+**It is drawn, not gridded.** It used to be flat pixel art on a grid of cells,
+which is how the whole game looked once and is not how it looks now: the
+buildings, the children and the two chalices in the opposite corner are all a
+hand-drawn line round a flat fill, and a 4px-gridded object on the same screen
+was the last thing on it made out of a different medium. It is cut with the
+city's own line now (`inkEdge`, see **The line** below), and three things about
+that are load-bearing:
+
+- **The line is two colours.** The bone is a pale fill, so the line on it is
+  the city's near-black ink; the glass has nothing behind it but the dark
+  inside the bulb, so the line on it is chalk — light on a dark ground. Same
+  hand, opposite end of the scale. Draw it all in either one alone and half
+  the object disappears.
+- **Nothing animated goes through `inkEdge`.** The wobble it rolls is cached
+  per edge on the edge's *length*, so a line whose length changes every frame
+  — the sand's surface, the falling thread — would mint a cache entry per
+  frame for ever. The moving parts are plain paths with a wobble of their own,
+  exactly as the drink in a chalice is.
+- **The sand eats the drawing.** The moon and the sun are drawn whole, outline
+  and all, and clipped to the sand that is left or has arrived. A line cut off
+  mid-stroke is what makes the moon look ground down rather than switched off.
+
+`GLASS_UNIT` in `src/config.js` is the unit its 31 x 46 layout grid is measured
+in — nothing snaps to that grid any more, it is only the ruler that keeps the
+clock the size it was. `GLASS` holds the drawn line's own dials, sized for an
+object this small (the city's `INK` numbers are cut for walls two hundred px
+long and come out clownish on a 124px clock), and `GLASS.ink` is an A/B:
+`false` puts the old pixel-art cut back, whole, out of `src/hourglass-pixel.js`
+— evaluation furniture, and the loser of the two comes out.
 `GLASS_CLOCK_TEXT` puts the digits back underneath it if you want them.
 
 ### Vampire vision
@@ -653,8 +703,9 @@ full the whole time you were walking down it.
 **It does not switch off, it wears off.** The last 30% of it is spent
 bleeding back out — the colour creeping in, the torches guttering, the crosses
 sinking back into ordinary road paint, the monsters settling back into the
-crowd. Once a monster looks like a child again you cannot talk to it, whether
-or not the clock says you have seconds left. At zero you are all the way back
+crowd. Once a monster looks like a child again you cannot talk to it, however
+much of the thirty seconds is left. Nothing on the HUD counts the vision down —
+the wearing off is the only warning you get. At zero you are all the way back
 in the ordinary city, and you go and find another cat.
 
 **And the city comes back badly.** The scenery does not slide between the two
@@ -890,6 +941,7 @@ src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
 src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
+src/hourglass-pixel.js  the older pixel-art cut of it, kept for the A/B
 src/label.js        the studio's label, which is the first thing on screen
 src/intro.js        the drawn intro, and the line he says over it
 src/bats.js         the room behind the right door: the clip that plays
@@ -1092,6 +1144,8 @@ PARTY.vision()     // 30 seconds of vampire vision (or vision(n) for n)
 PARTY.win()        // knock on the right door
 PARTY.restart()    // a fresh night
 PARTY.bench()      // ms a frame of city costs
+PARTY.glass(false)       // the old pixel-art hourglass; true for the drawn one
+PARTY.glass({wobble: 2.5})   // ...or turn one dial of its line
 PARTY.menu(1, 0.06)      // light a way in and pin its punch, to look at it
 PARTY.intro(8)     // replay the intro, at eight drawings a second
 PARTY.introAt(3.0)       // ...or pin it three seconds in

@@ -1,7 +1,7 @@
 import {
   VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, WORLD,
-  VISION_SECONDS, VISION_WARN, GLASS_CLOCK_TEXT, MAX_TIPS, END_STATS,
-  WIN_BATS, END, MENU, MENU_POP, CREDITS,
+  VISION_SECONDS, GLASS_CLOCK_TEXT, MAX_TIPS, END_STATS,
+  WIN_BATS, END, MENU, MENU_POP, CREDITS, HUD_PANELS,
 } from './config.js';
 import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
 import { DISTRICTS, blockAt } from './city.js';
@@ -12,7 +12,7 @@ import { lerpHex } from './palette.js';
 import { deathText, setDeathFont, deathFontsSettled } from './deathtype.js';
 import { drawBats } from './bats.js';
 // the chalices are drawn in the same line as the city - see src/ink.js
-import { inkEdge, INK_COLOR } from './ink.js';
+import { inkPoly, INK_COLOR } from './ink.js';
 import { INK, CHALICE } from './config.js';
 
 const FONT = (px, bold = true) =>
@@ -25,6 +25,22 @@ export function clockText(minutes) {
   const ampm = h < 12 ? 'AM' : 'PM';
   const hh = h === 0 ? 12 : h;
   return `${hh}:${mm} ${ampm}`;
+}
+
+/**
+ * A line of HUD text with the dark outline every sprite in this game has.
+ *
+ * The vitals and the clock have no box behind them any more, so the only
+ * thing holding them off a lit street is their own outline - the same answer
+ * the floating toasts already use, and the same one the drawings use.
+ */
+function outlined(ctx, text, x, y, fill, size) {
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(3, size * 0.3);
+  ctx.strokeStyle = '#0b0a10';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
 }
 
 function panel(ctx, x, y, w, h, alpha = 0.86) {
@@ -62,26 +78,6 @@ function panel(ctx, x, y, w, h, alpha = 0.86) {
 // state because the HUD is redrawn from scratch every frame and a slosh has
 // to outlive one of those.
 const SLOSH = new Map();
-
-/**
- * One segment of drawn outline per pair of points - a clunky, hand-cut cup.
- *
- * `col` matters more than it looks.  The city's ink is near-black because it
- * is drawn on lit walls; the HUD panel is near-black itself, so the same ink
- * on it is invisible and the glass comes out as a floating puddle of blood
- * with no cup round it.  On a dark ground the drawn line is a LIGHT line -
- * same wobble, same varying weight, same overshoot, opposite end of the
- * scale.  It is chalk instead of ink, and it is the same hand.
- */
-function inkPoly(ctx, pts, weight, seed, wobble, over, col, close = false) {
-  ctx.fillStyle = col;
-  const n = pts.length;
-  const last = close ? n : n - 1;
-  for (let i = 0; i < last; i++) {
-    const a = pts[i], b = pts[(i + 1) % n];
-    inkEdge(ctx, a[0], a[1], b[0], b[1], weight, seed, i, wobble, over, 1);
-  }
-}
 
 /**
  * The outline of a goblet, as plain points in a w x h box.
@@ -213,24 +209,7 @@ function chalice(ctx, x, y, w, h, frac, key, colors, t, label, value) {
   // --- what it says ------------------------------------------------------
   ctx.textAlign = 'center';
   ctx.font = FONT(13);
-  ctx.fillStyle = colors.value;
-  ctx.fillText(`${label} ${value}`, x + w / 2, y + h + 14);
-}
-
-function bar(ctx, x, y, w, h, frac, fill, back, label) {
-  ctx.fillStyle = back;
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = fill;
-  ctx.fillRect(x, y, Math.max(0, Math.min(1, frac)) * w, h);
-  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, w, h);
-  if (label) {
-    ctx.fillStyle = '#efe8f8';
-    ctx.font = FONT(13);
-    ctx.textAlign = 'left';
-    ctx.fillText(label, x + 6, y + h - 5);
-  }
+  outlined(ctx, `${label} ${value}`, x + w / 2, y + h + 14, colors.value, 13);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,12 +225,14 @@ export function drawHud(ctx, game) {
   // way round: 232 wide is what the CANDY line underneath needs at its
   // longest ("KIDS IN TOW 8" on the end of it), and that is the widest thing
   // in here - the glasses themselves would sit happily in less.
-  // The glasses start 18px below the panel's top edge, not 8.  The drawn rim
-  // sits ABOVE the chalice's own y - the ellipse is centred at 3% of the
-  // height with its own radius above that, plus the line's weight and wobble
-  // - so a nominal 8px gap was about 5px on screen and the cups looked jammed
-  // against the border.  Padding is measured to the ink, not to the box.
-  panel(ctx, 16, 16, 232, 124);
+  // The box behind them is gone.  Two drawn glasses standing on the street
+  // are a drawing standing on the street; the same two inside a violet
+  // rectangle are a drawing inside a widget, and the rectangle is the only
+  // ruled edge left on the screen.  The words under them keep their footing
+  // the way the toasts do, on their own dark outline (see `outlined`).
+  // The layout is unchanged: 232 wide is still what the CANDY line needs at
+  // its longest ("KIDS IN TOW 8"), and the glasses still start at y=34.
+  if (HUD_PANELS) panel(ctx, 16, 16, 232, 124);
   chalice(ctx, 54, 34, 41, 60, player.blood / BLOOD_MAX, 'blood',
           { fill: '#b01f36', empty: '#241016', glass: '#e8dae0',
             label: '#c98a96', value: '#efe8f8' },
@@ -260,12 +241,12 @@ export function drawHud(ctx, game) {
           { fill: '#7a45d0', empty: '#1a1430', glass: '#ded4f0',
             label: '#a89ac8', value: '#efe8f8' },
           clock.t, 'NIGHT', `${Math.ceil(player.mana)}`);
-  ctx.fillStyle = player.candy > 0 ? '#e8b23a' : '#7a7488';
   ctx.font = FONT(15);
   ctx.textAlign = 'left';
   let candyLine = `CANDY ${player.candy}`;
   if (player.followers > 0) candyLine += `   KIDS IN TOW ${player.followers}`;
-  ctx.fillText(candyLine, 26, 130);
+  outlined(ctx, candyLine, 26, 130,
+           player.candy > 0 ? '#e8b23a' : '#9a94a8', 15);
 
   // --- the hourglass ------------------------------------------------------
   // No digits.  The moon in the top bulb is ground down into the sun in the
@@ -274,7 +255,6 @@ export function drawHud(ctx, game) {
   const panic = left < 60;
   drawClock(ctx, clock, panic);
 
-  drawVision(ctx, game);
   drawMinimap(ctx, game);
   // The deck stays up while somebody is talking to you - that is the moment a
   // card arrives, and watching it land is the point.  It clears the dialogue
@@ -333,7 +313,7 @@ const CLOCK_H = GLASS_H + CLOCK_PAD * 2 + (GLASS_CLOCK_TEXT ? 26 : 0);
 
 function drawClock(ctx, clock, panic) {
   const x = VIEW_W - 16 - CLOCK_W, y = 16;
-  panel(ctx, x, y, CLOCK_W, CLOCK_H, panic ? 0.92 : 0.86);
+  if (HUD_PANELS) panel(ctx, x, y, CLOCK_W, CLOCK_H, panic ? 0.92 : 0.86);
   drawHourglass(ctx, x + CLOCK_PAD, y + CLOCK_PAD,
                 clock.minutes / NIGHT_MINUTES, clock.t, panic);
 
@@ -341,29 +321,10 @@ function drawClock(ctx, clock, panic) {
     const hot = panic && Math.floor(clock.t * 4) % 2;
     ctx.textAlign = 'center';
     ctx.font = FONT(20);
-    ctx.fillStyle = panic ? (hot ? '#ff5a4a' : '#ffb24a') : '#f0e6ff';
-    ctx.fillText(clockText(clock.minutes), x + CLOCK_W / 2,
-                 y + CLOCK_PAD + GLASS_H + 20);
+    outlined(ctx, clockText(clock.minutes), x + CLOCK_W / 2,
+             y + CLOCK_PAD + GLASS_H + 20,
+             panic ? (hot ? '#ff5a4a' : '#ffb24a') : '#f0e6ff', 20);
   }
-}
-
-function drawVision(ctx, game) {
-  if (game.vision <= 0 && game.visionMix <= 0.01) return;
-  const low = game.vision > 0 && game.vision < VISION_WARN;
-  const blink = low && Math.floor(game.clock.t * 6) % 2 === 0;
-  // sits right under the vitals panel and matches its width - a 268 box under
-  // a 232 one reads as a mistake rather than as two panels
-  panel(ctx, 16, 150, 232, 50, 0.86);
-  ctx.textAlign = 'left';
-  ctx.font = FONT(14);
-  ctx.fillStyle = blink ? '#ffd0c4' : '#ff6a52';
-  ctx.fillText('VAMPIRE VISION', 26, 172);
-  ctx.textAlign = 'right';
-  ctx.fillStyle = blink ? '#ffd0c4' : '#e8dcff';
-  ctx.fillText(`${Math.ceil(game.vision)}s`, 238, 172);
-  bar(ctx, 26, 178, 212, 12, game.vision / VISION_SECONDS,
-      blink ? '#ffb4a0' : '#c8382c', '#2a1414');
-  ctx.textAlign = 'left';
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, END, MENU, MENU_POP, INTRO } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, GLASS, END, MENU, MENU_POP, INTRO } from './config.js';
 import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
@@ -277,6 +277,18 @@ window.PARTY = {
    * dead flat top - worth seeing once, it is the old bar wearing a glass.
    */
   chalice(v) { if (v) Object.assign(CHALICE, v); return { ...CHALICE }; },
+  /**
+   * A/B for the hourglass.  `PARTY.glass(false)` puts the old flat pixel-art
+   * clock back, `PARTY.glass(true)` returns to the drawn one, and an object
+   * turns one of the line's dials - `PARTY.glass({wobble: 2.5})` for a
+   * shakier hand, `{over: 0}` to stop the corners running past each other.
+   * Evaluation furniture; the loser of the two comes out.
+   */
+  glass(v) {
+    if (typeof v === 'boolean') GLASS.ink = v;
+    else if (v && typeof v === 'object') Object.assign(GLASS, v);
+    return { ...GLASS };
+  },
   /** A/B for the rounding rule the people are drawn on - evaluation only. */
   worldLattice(on) { setWorldLattice(on); return on ? 'people on the street lattice' : 'people on the camera lattice (the old rule)'; },
   restart,

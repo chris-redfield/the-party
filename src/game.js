@@ -49,6 +49,9 @@ export function newGame(seedStr, citySeed) {
     // hold an answer on your behalf, only the claims.
     tips: [], tipsTaken: 0,
     toasts: [], log: [],
+    // false until the first frame the player actually has the controls - the
+    // opening line is thrown then, not when the night is built.  See below.
+    opened: false,
     prompt: null, dialogue: null, target: null,
     vision: 0, visionMix: 0, bleed: 0, camShake: 0,
     endTitle: '', endText: '', endT: 0,   // seconds the end card has been up
@@ -96,6 +99,18 @@ function distTo(a, bx, by) { return Math.hypot(a.x - bx, a.y - by); }
 export function updateGame(game, dt, input) {
   if (game.state !== 'play') return;
   const { player: p, world, city } = game;
+
+  // --- the one thing the game asks of you ----------------------------------
+  // Thrown on the first frame the player has the controls rather than when
+  // the night is built, because those are not the same moment: the drawn
+  // intro runs for twenty seconds in between, and a toast queued before it
+  // would be over before the street was ever on screen.  This is also why it
+  // does not need its own handling for the intro being switched off or for a
+  // restart - updateGame's first frame IS "you have control", every time.
+  if (!game.opened) {
+    game.opened = true;
+    toast(game, 'Find THE PARTY!', '#f0e6ff', true);
+  }
 
   // --- the night burns down ------------------------------------------------
   game.clock.t += dt;
