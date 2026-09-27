@@ -233,11 +233,22 @@ export function drawHud(ctx, game) {
   // The layout is unchanged: 232 wide is still what the CANDY line needs at
   // its longest ("KIDS IN TOW 8"), and the glasses still start at y=34.
   if (HUD_PANELS) panel(ctx, 16, 16, 232, 124);
-  chalice(ctx, 54, 34, 41, 60, player.blood / BLOOD_MAX, 'blood',
+  // The two of them stand `VIT_PITCH` apart, centre to centre, and that is
+  // the number to move - not either glass's x, which is how they end up
+  // drifting off the CANDY line under them.
+  //
+  // It was 116, and it is measured on the DRAWN glasses rather than on their
+  // 41-wide boxes: the rim ellipse runs the full width of the box and the ink
+  // line wobbles and overshoots a few px past that again, so what 116 gave
+  // was 68px of clear air between the two drawings.  93 is that gap less a
+  // third of itself - 45px of air - which still leaves 20-odd px between the
+  // ends of BLOOD 100 and NIGHT 100 underneath them.
+  const VIT_X = 54, VIT_W = 41, VIT_H = 60, VIT_PITCH = 93;
+  chalice(ctx, VIT_X, 34, VIT_W, VIT_H, player.blood / BLOOD_MAX, 'blood',
           { fill: '#b01f36', empty: '#241016', glass: '#e8dae0',
             label: '#c98a96', value: '#efe8f8' },
           clock.t, 'BLOOD', `${Math.ceil(player.blood)}`);
-  chalice(ctx, 170, 34, 41, 60, player.mana / MANA_MAX, 'night',
+  chalice(ctx, VIT_X + VIT_PITCH, 34, VIT_W, VIT_H, player.mana / MANA_MAX, 'night',
           { fill: '#7a45d0', empty: '#1a1430', glass: '#ded4f0',
             label: '#a89ac8', value: '#efe8f8' },
           clock.t, 'NIGHT', `${Math.ceil(player.mana)}`);
@@ -765,7 +776,11 @@ function drawMinimap(ctx, game) {
   // what is left under those.  The writing hangs off the bottom of the paper
   // rather than off the screen, so lowering FOOT brings the sheet and its
   // caption down together and keeps the gap between them.
-  const CAPS = 36, FOOT = 20;
+  // FOOT was 20, which held the writing a whole line clear of the bottom of
+  // the screen for no reason - the corner had nothing else in it.  6 brings
+  // the sheet and its caption down by about the height of one of those lines
+  // and still leaves the second line clear of the edge.
+  const CAPS = 36, FOOT = 6;
   const sy = VIEW_H - FOOT - CAPS - sh;
   drawScroll(ctx, sx, sy, S, sq);
 
