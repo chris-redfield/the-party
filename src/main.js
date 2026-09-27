@@ -157,7 +157,7 @@ function frame(now) {
   if (game.state === 'title') {
     // The front door.  Three ways in, and the two that are not the game open a
     // card that comes straight back here - there is nowhere else to go from
-    // them, so ENTER and ESC both mean back.
+    // them, so ENTER and BACKSPACE both mean back.
     setBassProximity(0);
     // The cursor moves freely right up until something is chosen; after that
     // the line is committed and the screen is only waiting for its punch to
@@ -183,11 +183,11 @@ function frame(now) {
     // from here, because that is what it has always done on this card.
     setBassProximity(0);
     if (input.pressed('start') || input.pressed('bat')) { resumeAudio(); game.state = beginNight(); }
-    if (input.pressed('pause')) game.state = 'title';
+    if (input.pressed('back')) game.state = 'title';
     drawTitle(ctx, now / 1000);
   } else if (game.state === 'credits') {
     setBassProximity(0);
-    if (input.pressed('start') || input.pressed('bat') || input.pressed('pause')) {
+    if (input.pressed('start') || input.pressed('bat') || input.pressed('back')) {
       game.state = 'title';
     }
     drawCredits(ctx, now / 1000);
@@ -209,8 +209,10 @@ function frame(now) {
     drawEnd(ctx, game, game.endT);
     if (input.pressed('start')) restart();
   } else {
-    if (input.pressed('pause')) { paused = !paused; setMusicPaused(paused); }
-    if (input.pressed('restart') && input.held('pause')) restart();
+    // Enter is `start` everywhere else and the pause toggle here; see the note
+    // in src/input.js for why it is read off `start` rather than bound twice.
+    if (input.pressed('start')) { paused = !paused; setMusicPaused(paused); }
+    if (input.pressed('restart') && input.held('start')) restart();
     if (paused) {
       setBassProximity(0);
     } else {

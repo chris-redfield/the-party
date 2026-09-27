@@ -115,7 +115,7 @@ reads as the page having jumped. `LABEL` in `src/config.js` holds all of it and
 | `SPACE` | bat form: fly over children, and over roads |
 | `E` | knock on a door / talk to a monster you can actually see |
 | `Q` | dump your candy on the pavement |
-| `ESC` / `P` | pause · hold `ESC` + `R` for a fresh night |
+| `ENTER` | pause · hold `ENTER` + `R` for a fresh night |
 | `M` | mute · `[` `]` zoom |
 | click a card | pull a buried tip back to the front of the deck |
 
@@ -537,7 +537,7 @@ window does nothing: it is a commitment, not a queue.
 
 `HOW TO PLAY` opens the red card the game used to open on — the controls and
 the catch, unchanged. `ENTER` still starts the night from it, because that is
-what `ENTER` has always done on that card, and `ESC` comes back. `CREDITS` is
+what `ENTER` has always done on that card, and `BACKSPACE` comes back. `CREDITS` is
 the same blood card, and its first two lines are one sentence — SABOROSA is
 these people — so they sit closer together than the third does. Both come
 straight back to the door; there is nowhere else to go from either.
@@ -1068,7 +1068,7 @@ There are no sound files for any of it, and `src/audio.js` is the whole of it.
 
 The exception is the soundtrack, which is a real recording: `assets/ost` is
 streamed through an `<audio>` element into the same master gain as everything
-else, so it loops through the night, `M` mutes it with the rest, `ESC` pauses
+else, so it loops through the night, `M` mutes it with the rest, `ENTER` pauses
 it where it stands, and a fresh night starts it again from the top. When you
 die it goes — the death screen is one word on a flat red field and a
 soundtrack still playing under it is the game carrying on without you.

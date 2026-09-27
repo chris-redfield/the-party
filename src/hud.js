@@ -878,9 +878,9 @@ export function drawPause(ctx) {
   ctx.fillStyle = BLOOD_RED;
   deathText(ctx, 'PAUSED', VIEW_W / 2, VIEW_H / 2 - 6, 130);
   ctx.fillStyle = '#e4dcee';
-  deathText(ctx, 'ESC TO GO BACK OUT THERE   -   M MUTES   -   [ ] ZOOM',
+  deathText(ctx, 'ENTER TO GO BACK OUT THERE   -   M MUTES   -   [ ] ZOOM',
             VIEW_W / 2, VIEW_H / 2 + 54, 26);
-  deathText(ctx, 'HOLD ESC AND PRESS R FOR A DIFFERENT NIGHT',
+  deathText(ctx, 'HOLD ENTER AND PRESS R FOR A DIFFERENT NIGHT',
             VIEW_W / 2, VIEW_H / 2 + 88, 26);
 }
 
@@ -1124,7 +1124,7 @@ export function drawTitle(ctx, t) {
   // card's line blinks.  Two colours taking turns was the mono card's trick
   // and there is only one colour on this one.
   if (Math.floor(t * 2) % 2) {
-    deathText(ctx, 'ENTER \u00b7 MIDNIGHT IS WASTING       ESC \u00b7 BACK',
+    deathText(ctx, 'ENTER \u00b7 MIDNIGHT IS WASTING     BACKSPACE \u00b7 BACK',
               MID, ENTER_BASE, ENTER_SIZE);
   }
 }

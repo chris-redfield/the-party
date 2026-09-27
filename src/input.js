@@ -4,11 +4,31 @@ const MAP = {
   ArrowLeft: 'left', KeyA: 'left',
   ArrowRight: 'right', KeyD: 'right',
   Space: 'bat',
-  KeyE: 'use', Enter: 'start',
+  KeyE: 'use', Enter: 'start', Backspace: 'back',
   KeyQ: 'drop', KeyM: 'mute',
   BracketLeft: 'zoomOut', BracketRight: 'zoomIn',
-  KeyR: 'restart', Escape: 'pause', KeyP: 'pause',
+  KeyR: 'restart',
 };
+
+// THERE IS NO PAUSE KEY IN THIS TABLE, and that is deliberate.
+//
+// It was Escape, which cannot work: the game ships to itch.io in a fullscreen
+// embed and Escape belongs to the browser's Fullscreen API, so pressing it
+// paused the night AND dropped the player out of fullscreen, every time.  It
+// was briefly P, which nobody would ever guess.
+//
+// So pausing is ENTER, and Enter is already `start`.  The two never collide
+// because they never share a screen: `start` chooses on the title card, opens
+// the night from HOW TO PLAY, hurries the intro along and deals a fresh night
+// from an end card, and every one of those is a state in which the game is
+// not running.  `pause` is the only thing Enter can mean while it IS running.
+// So the play branch in src/main.js reads `start` as the pause toggle rather
+// than there being a second binding here - two actions on one key would fire
+// together on HOW TO PLAY, where Enter starts the night and would also have
+// to mean back.
+//
+// `back` is Backspace, and it only exists on the cards - the one place where
+// there is somewhere to go back TO.
 
 export function makeInput(onFirstKey) {
   const down = new Set();
