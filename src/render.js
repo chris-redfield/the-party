@@ -431,14 +431,14 @@ function drawPlayer(ctx, p, o, t) {
     ctx.restore();
   }
 
-  if (p.hurtFlash > 0) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = Math.max(0, p.hurtFlash) * 0.6;
-    ctx.fillStyle = '#c01030';
-    ctx.fillRect(sx - 26 * z, sy - 60 * z, 52 * z, 62 * z);
-    ctx.restore();
-  }
+  // There used to be a red rectangle here, thrown up around the player on
+  // every hit with `lighter` compositing and an alpha that faded out.  It was
+  // the last thing in the game doing either: everything else is opaque, flat
+  // and hard-edged, and it read as a box of light rather than as being hurt.
+  //
+  // `p.hurtFlash` is deliberately still running - it is a plain "was hit in
+  // the last 0.45s" timer, it costs nothing, and it is the hook to hang any
+  // future hit feedback on.  Nothing draws from it now.
 }
 
 // ---------------------------------------------------------------------------

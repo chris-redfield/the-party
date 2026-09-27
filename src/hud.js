@@ -211,7 +211,7 @@ function chalice(ctx, x, y, w, h, frac, key, colors, t, label, value) {
   ctx.textAlign = 'center';
   ctx.font = FONT(13);
   ctx.fillStyle = colors.value;
-  ctx.fillText(`${label} ${value}`, x + w / 2, y + h + 16);
+  ctx.fillText(`${label} ${value}`, x + w / 2, y + h + 14);
 }
 
 function bar(ctx, x, y, w, h, frac, fill, back, label) {
@@ -239,12 +239,21 @@ export function drawHud(ctx, game) {
   // Two glasses instead of two bars.  They are the same two numbers, but a
   // glass is read at a glance and from the corner of the eye, which is the
   // only way anybody reads their health while something is chasing them.
-  panel(ctx, 16, 16, 268, 140);
-  chalice(ctx, 62, 24, 58, 86, player.blood / BLOOD_MAX, 'blood',
+  // 58x86 glasses at 70%.  The panel is sized off them rather than the other
+  // way round: 232 wide is what the CANDY line underneath needs at its
+  // longest ("KIDS IN TOW 8" on the end of it), and that is the widest thing
+  // in here - the glasses themselves would sit happily in less.
+  // The glasses start 18px below the panel's top edge, not 8.  The drawn rim
+  // sits ABOVE the chalice's own y - the ellipse is centred at 3% of the
+  // height with its own radius above that, plus the line's weight and wobble
+  // - so a nominal 8px gap was about 5px on screen and the cups looked jammed
+  // against the border.  Padding is measured to the ink, not to the box.
+  panel(ctx, 16, 16, 232, 124);
+  chalice(ctx, 54, 34, 41, 60, player.blood / BLOOD_MAX, 'blood',
           { fill: '#b01f36', empty: '#241016', glass: '#e8dae0',
             label: '#c98a96', value: '#efe8f8' },
           clock.t, 'BLOOD', `${Math.ceil(player.blood)}`);
-  chalice(ctx, 182, 24, 58, 86, player.mana / MANA_MAX, 'night',
+  chalice(ctx, 170, 34, 41, 60, player.mana / MANA_MAX, 'night',
           { fill: '#7a45d0', empty: '#1a1430', glass: '#ded4f0',
             label: '#a89ac8', value: '#efe8f8' },
           clock.t, 'NIGHT', `${Math.ceil(player.mana)}`);
@@ -253,7 +262,7 @@ export function drawHud(ctx, game) {
   ctx.textAlign = 'left';
   let candyLine = `CANDY ${player.candy}`;
   if (player.followers > 0) candyLine += `   KIDS IN TOW ${player.followers}`;
-  ctx.fillText(candyLine, 26, 148);
+  ctx.fillText(candyLine, 26, 130);
 
   // --- the hourglass ------------------------------------------------------
   // No digits.  The moon in the top bulb is ground down into the sun in the
@@ -339,17 +348,17 @@ function drawVision(ctx, game) {
   if (game.vision <= 0 && game.visionMix <= 0.01) return;
   const low = game.vision > 0 && game.vision < VISION_WARN;
   const blink = low && Math.floor(game.clock.t * 6) % 2 === 0;
-  // pushed down to clear the chalices - the vitals panel got taller when the
-  // bars became glasses
-  panel(ctx, 16, 174, 268, 50, 0.86);
+  // sits right under the vitals panel and matches its width - a 268 box under
+  // a 232 one reads as a mistake rather than as two panels
+  panel(ctx, 16, 150, 232, 50, 0.86);
   ctx.textAlign = 'left';
   ctx.font = FONT(14);
   ctx.fillStyle = blink ? '#ffd0c4' : '#ff6a52';
-  ctx.fillText('VAMPIRE VISION', 26, 196);
+  ctx.fillText('VAMPIRE VISION', 26, 172);
   ctx.textAlign = 'right';
   ctx.fillStyle = blink ? '#ffd0c4' : '#e8dcff';
-  ctx.fillText(`${Math.ceil(game.vision)}s`, 274, 196);
-  bar(ctx, 26, 202, 248, 12, game.vision / VISION_SECONDS,
+  ctx.fillText(`${Math.ceil(game.vision)}s`, 238, 172);
+  bar(ctx, 26, 178, 212, 12, game.vision / VISION_SECONDS,
       blink ? '#ffb4a0' : '#c8382c', '#2a1414');
   ctx.textAlign = 'left';
 }
