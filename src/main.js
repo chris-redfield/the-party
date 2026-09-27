@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, END } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, END, MENU, MENU_POP } from './config.js';
 import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
@@ -6,7 +6,7 @@ import { newGame, updateGame, knock, bringTipForward, giveTip } from './game.js'
 import { isWalkable } from './city.js';
 import { FACT_KEYS } from './hints.js';
 import { makeCamera, updateCamera, drawScene, drawBleed, setWorldLattice } from './render.js';
-import { drawHud, drawTitle, drawEnd, drawPause, cardAt, tipVotes } from './hud.js';
+import { drawHud, drawTitle, drawMenu, drawCredits, drawEnd, drawPause, cardAt, tipVotes } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic } from './audio.js';
 import { loadDeathFonts } from './deathtype.js';
 import { loadBats } from './bats.js';
@@ -66,6 +66,8 @@ let paused = false;
 // first press, so a recipe that taps Enter to start the night would otherwise
 // spend that press skipping a label and then sit on the title card.
 let batsStarted = false;
+let menuIdx = 0;                   // which way in is lit on the front door
+let menuPop = null;                // seconds since one was chosen, or null
 let labelT = new URLSearchParams(location.search).get('label') === '0' ? 1e9 : 0;
 let last = performance.now();
 
@@ -146,12 +148,41 @@ function frame(now) {
   if (input.pressed('zoomOut') && zoomIdx > 0) cam.z = ZOOMS[--zoomIdx];
 
   if (game.state === 'title') {
+    // The front door.  Three ways in, and the two that are not the game open a
+    // card that comes straight back here - there is nowhere else to go from
+    // them, so ENTER and ESC both mean back.
     setBassProximity(0);
-    if (input.pressed('start') || input.pressed('bat')) {
-      resumeAudio();
-      game.state = 'play';
+    // The cursor moves freely right up until something is chosen; after that
+    // the line is committed and the screen is only waiting for its punch to
+    // finish.  A second press in that window does nothing - it is not a queue.
+    if (menuPop == null) {
+      if (input.pressed('up')) menuIdx = (menuIdx + MENU.length - 1) % MENU.length;
+      if (input.pressed('down')) menuIdx = (menuIdx + 1) % MENU.length;
+      if (input.pressed('start') || input.pressed('bat')) {
+        menuPop = 0;
+        if (MENU[menuIdx][1] === 'play') resumeAudio();   // on the press, not after it
+      }
+    } else {
+      menuPop += dt;
+      if (menuPop >= MENU_POP.hold) {
+        game.state = MENU[menuIdx][1];
+        menuPop = null;
+      }
     }
+    drawMenu(ctx, menuIdx, now / 1000, menuPop);
+  } else if (game.state === 'howto') {
+    // The red card the game used to open on.  ENTER still starts the night
+    // from here, because that is what it has always done on this card.
+    setBassProximity(0);
+    if (input.pressed('start') || input.pressed('bat')) { resumeAudio(); game.state = 'play'; }
+    if (input.pressed('pause')) game.state = 'title';
     drawTitle(ctx, now / 1000);
+  } else if (game.state === 'credits') {
+    setBassProximity(0);
+    if (input.pressed('start') || input.pressed('bat') || input.pressed('pause')) {
+      game.state = 'title';
+    }
+    drawCredits(ctx, now / 1000);
   } else if (game.state === 'win' || game.state === 'lose') {
     setBassProximity(game.state === 'win' ? 0.9 : 0);
     updateCamera(cam, game.player, dt);
@@ -188,6 +219,8 @@ window.PARTY = {
   get label() { return labelT; },
   /** false while the art is still being cut and nothing is allowed to move */
   get ready() { return ready; },
+  /** light a way in, and pin its punch part way through, for looking at it */
+  menu(i = 0, pop = null) { menuIdx = i; menuPop = pop; },
   get cam() { return cam; },
   /**
    * A/B for the drawn line on the buildings.  `PARTY.ink(false)` puts the old

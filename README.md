@@ -385,9 +385,9 @@ in the game is stroked.
 
 It is set in **Deathly**, the only real typeface in the game — everything
 else, down to the hourglass, is drawn out of code. It is not only on the end
-cards any more: **the title card is the same card the night ends on** — flat
-blood red edge to edge, every word on it cut out of that red in black, in this
-one face — and the same face sets **PAUSED** in the game's red over the stopped
+cards: **HOW TO PLAY is the same card the night ends on** — flat blood red
+edge to edge, every word on it cut out of that red in black, in this one face
+— and so is the credits card; and the same face sets **PAUSED** in the game's red over the stopped
 street, and every one of the floating lines the game throws up
 while you play — the tip landing, the candy, the child walking into you. Those
 keep their own colours, because what happened is in the colour, and they are
@@ -438,6 +438,59 @@ red field with not one black pixel on it, and at 5 s it is fully set.
 > foundry, or a different face. Dystopian Canticle (SIL OFL, no such
 > restriction) is still in `assets/` and is a drop-in swap: change `FAMILY`,
 > `FONT_URL` and `SCALE` at the top of `src/deathtype.js`.
+
+### The front door
+
+**The title screen is the one screen in this game that is not a field of
+colour.** Black, with THE PARTY across it in the blood and three ways in under
+it: START GAME, HOW TO PLAY, CREDITS. Nothing of the game is on it yet, so it
+does not have to be either of the two palettes — what it keeps is the one
+colour, so the red the night ends on is the red it starts on.
+
+**Which line you are on is which line you can read.** The chosen one is the
+blood; the others are that red most of the way to black. No cursor, no marker,
+no third colour, nothing that has to be drawn and then explained.
+
+**Choosing one punches it**, and moving onto one does not. The line swells by
+`MENU_POP.amount`, overshoots back past its own size and settles at exactly
+where the highlight left it — `1 + amount * (1 - easeOutBack(p))`, which is
+BATIDÃO DE CÔCO's curve and its numbers, 0.10 over 260 ms, so the two front
+doors answer the same way. Measured on the card: 314 pixels of ink at rest,
+337 on the press, 310 at the bottom of the overshoot, 314 again when it
+settles.
+
+It is on the **commitment**, never on the cursor move. A punch answers a
+choice; spending it on every nudge of the arrow keys cheapens it and leaves
+the actual choice with no feedback of its own, and what a cursor move gets is
+the highlight — a state does not need an animation to announce itself. The
+screen then holds for `MENU_POP.hold` before it changes, or the punch plays
+out on a screen nobody is looking at any more. A second press inside that
+window does nothing: it is a commitment, not a queue.
+
+`HOW TO PLAY` opens the red card the game used to open on — the controls and
+the catch, unchanged. `ENTER` still starts the night from it, because that is
+what `ENTER` has always done on that card, and `ESC` comes back. `CREDITS` is
+the same blood card, and its first two lines are one sentence — SABOROSA is
+these people — so they sit closer together than the third does. Both come
+straight back to the door; there is nowhere else to go from either.
+
+`MENU` and `CREDITS` in `src/config.js` are the two lists. Each credit line
+carries its own size, relative to the block, so the studio stays the biggest
+thing on the card however long a name gets, and the gap that follows it, so a
+sentence broken over two lines reads as one.
+
+> **The face has no accents.** Deathly claims them and does not have them:
+> every accented codepoint in it — ó, á, ã, ç — is mapped straight to the
+> unaccented glyph, so a name set in it comes out spelled wrong rather than
+> set in a fallback, which is worse, because nothing looks broken. So the
+> marks are **drawn**, in `src/deathtype.js`, like everything else here that
+> is not a letter: the string is split into base letters and combining marks
+> with NFD, the letters are set as one run so the face kerns them exactly as
+> it would have, and each mark is drawn over the letter it belongs to, found
+> by measuring the run up to it. They are wedges rather than strokes, because
+> every letter on this face is a wedge and a round accent over a spiked letter
+> reads as a second font having been patched in. Acute, grave, circumflex,
+> tilde, diaeresis and cedilla, which covers Portuguese.
 
 ### The hourglass
 
@@ -964,6 +1017,10 @@ PARTY.vision()     // 30 seconds of vampire vision (or vision(n) for n)
 PARTY.win()        // knock on the right door
 PARTY.restart()    // a fresh night
 PARTY.bench()      // ms a frame of city costs
+PARTY.menu(1, 0.06)      // light a way in and pin its punch, to look at it
+PARTY.END          // the ending's live dials - source, type, textAt, snap
+PARTY.label        // seconds the studio label has been up
+PARTY.ready        // false while the art is still being cut
 PARTY.isWalkable(x, y)   // for invariant checks: may a vampire stand here?
 PARTY.game         // everything
 ```

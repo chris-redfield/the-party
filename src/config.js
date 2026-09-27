@@ -169,6 +169,41 @@ export const LABEL = {
   wide: 0.52,       // how much of the screen the label spans
 };
 
+// --- the front door ---------------------------------------------------------
+// The title screen is the one card in the game that is NOT the blood field:
+// black, with the name and the three ways in cut into it in red.  The red
+// field it used to be is still there - it is what HOW TO PLAY opens.
+// The stamp an item takes when you CHOOSE it - swell, overshoot, settle.  It
+// is not what the cursor does: moving onto a line lights it, and a state does
+// not need an animation to announce itself.  A punch answers a commitment, and
+// spending it on every nudge of the arrow keys cheapens it and leaves the
+// actual choice with no feedback of its own.  Same shape and the same numbers
+// as BATIDAO DE COCO's, so the two front doors answer the same way.
+export const MENU_POP = {
+  amount: 0.10,     // how far it swells
+  ms: 0.26,         // and over how long
+  hold: 0.30,       // the beat the screen waits before it changes, or the
+};                  // punch plays on a screen nobody is looking at any more
+
+export const MENU = [
+  ['START GAME', 'play'],
+  ['HOW TO PLAY', 'howto'],
+  ['CREDITS', 'credits'],
+];
+
+// The credits are the blood card, not the black one: black words cut out of
+// the red, which is the rule every other card in this game follows.  Set as
+// written - the face has lowercase and it has the accents, both checked - so
+// the names are the names rather than a shout of them.  `size` is relative:
+// 1 is the size the block is fitted at.
+export const CREDITS = [
+  //  line                                  size   gap after it
+  ['SABOROSA',                              1.9,  0.42],
+  ['is',                                    0.62, 1.15],
+  ['Gabriel G\u00f3es & Christian Miranda',  1],
+  ["Music by Karina D'Alessandre",          0.82],
+];
+
 export const END_STATS = false;
 
 // --- what is behind the right door ------------------------------------------

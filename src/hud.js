@@ -1,13 +1,14 @@
 import {
   VIEW_W, VIEW_H, BLOOD_MAX, MANA_MAX, NIGHT_MINUTES, WORLD,
   VISION_SECONDS, VISION_WARN, GLASS_CLOCK_TEXT, MAX_TIPS, END_STATS,
-  WIN_BATS, END,
+  WIN_BATS, END, MENU, MENU_POP, CREDITS,
 } from './config.js';
 import { drawHourglass, GLASS_W, GLASS_H } from './hourglass.js';
 import { DISTRICTS, blockAt } from './city.js';
 import { shortFact, cardFact, addressOf, claimedIds, FACT_KEYS } from './hints.js';
 // the red the cat's gift pours down the screen, which is the red you dry into
 import { BLOOD_RED } from './render.js';
+import { lerpHex } from './palette.js';
 import { deathText, setDeathFont, deathFontsSettled } from './deathtype.js';
 import { drawBats } from './bats.js';
 // the chalices are drawn in the same line as the city - see src/ink.js
@@ -784,6 +785,114 @@ function fitTo(ctx, text, maxW, start) {
   return w > maxW ? start * (maxW / w) : start;
 }
 
+// ---------------------------------------------------------------------------
+// The front door
+// ---------------------------------------------------------------------------
+// Black, with the name across it and the three ways in under that, and it is
+// the only screen in the game that is not one of the two fields - the city's
+// palette or the blood.  It does not have to be: nothing of the game is on it
+// yet.  What it keeps is the game's one colour, so the red that the night
+// ends on is the red you start on.
+//
+// The chosen line is the blood; the others are the same red taken most of the
+// way to black.  No marker, no cursor, no third colour - which one you are on
+// is which one you can read.
+const MENU_TOP = 0.50;                  // the first item, down the screen
+const MENU_SIZE = 52, MENU_PITCH = 1.5;
+const MENU_DIM = 0.55;                  // how far the unchosen go towards black
+
+/**
+ * The punch, as a multiplier: `1 + amount * (1 - easeOutBack(p))`.  It swells
+ * on the frame it is asked for, overshoots back past its own size, and settles
+ * at exactly 1 - so the line ends up where the highlight left it and the punch
+ * is a move rather than a second way of being selected.
+ *
+ * `pop` is seconds since the choice, or null when nothing has been chosen.
+ */
+const easeOutBack = (p) => {
+  const c = 1.70158;
+  return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+};
+function popScale(pop) {
+  if (pop == null || MENU_POP.ms <= 0 || MENU_POP.amount <= 0) return 1;
+  const p = Math.min(1, pop / MENU_POP.ms);
+  return 1 + MENU_POP.amount * (1 - easeOutBack(p));
+}
+
+export function drawMenu(ctx, idx, t, pop) {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  if (!deathFontsSettled()) return;     // the same rule every card here follows
+
+  ctx.fillStyle = BLOOD_RED;
+  const big = fitTo(ctx, 'THE PARTY', TITLE_W, 170);
+  setDeathFont(ctx, big);
+  const asc = ctx.measureText('THE PARTY').actualBoundingBoxAscent || big * 0.95;
+  deathText(ctx, 'THE PARTY', MID, VIEW_H * 0.24 + asc / 2, big);
+
+  MENU.forEach(([label], i) => {
+    ctx.fillStyle = i === idx ? BLOOD_RED : lerpHex(BLOOD_RED, '#000000', MENU_DIM);
+    const y = VIEW_H * MENU_TOP + i * MENU_SIZE * MENU_PITCH;
+    const k = i === idx ? popScale(pop) : 1;
+    if (k === 1) { deathText(ctx, label, MID, y, MENU_SIZE); return; }
+    // about the line's own middle, not its baseline, or it grows downwards
+    const cy = y - MENU_SIZE * 0.34;
+    ctx.save();
+    ctx.translate(MID, cy);
+    ctx.scale(k, k);
+    ctx.translate(-MID, -cy);
+    deathText(ctx, label, MID, y, MENU_SIZE);
+    ctx.restore();
+  });
+
+  ctx.fillStyle = lerpHex(BLOOD_RED, '#000000', MENU_DIM);
+  deathText(ctx, 'ARROWS \u00b7 ENTER', MID, ENTER_BASE, ENTER_SIZE * 0.8);
+}
+
+/**
+ * Who made it.  The blood card, like the two the night ends on and like the
+ * one HOW TO PLAY opens - black words cut out of the red.  The front door is
+ * the only black screen in the game and this is not it.
+ *
+ * Three lines at three sizes, fitted as one block: the widest line decides the
+ * size and the others take their share of it, so the studio stays the biggest
+ * thing on the card however long a name gets.  Each line carries the gap that
+ * follows it as well, because the first two are one sentence - SABOROSA is
+ * these people - and a sentence that breaks over two lines should sit closer
+ * together than the next thing does.
+ */
+const CREDITS_BASE = 58;                // the middle line, before fitting
+const CREDITS_PITCH = 1.7;              // line to line, off each line's own size
+
+export function drawCredits(ctx, t) {
+  ctx.fillStyle = BLOOD_RED;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  if (!deathFontsSettled()) return;
+  ctx.fillStyle = '#000000';
+
+  let unit = CREDITS_BASE;
+  for (const [line, rel] of CREDITS) {
+    unit = Math.min(unit, fitTo(ctx, line, VIEW_W - 160, CREDITS_BASE * rel) / rel);
+  }
+  // The gaps BETWEEN the lines are what the block is, not the gaps after them -
+  // centring on the sum of all of them hangs an empty line's worth of air off
+  // the bottom and pushes the words up the card.
+  const gaps = CREDITS.slice(0, -1).map(([, rel, gap], i) =>
+    unit * rel * CREDITS_PITCH * (gap == null ? 1 : gap));
+  const span = gaps.reduce((a, b) => a + b, 0);
+  // and a baseline is not the middle of a letter: half a cap puts the ink on
+  // the centre line rather than the line the ink sits on
+  let y = VIEW_H / 2 - span / 2 + unit * CREDITS[0][1] * 0.34;
+  CREDITS.forEach(([line, rel], i) => {
+    deathText(ctx, line, MID, y, unit * rel);
+    y += gaps[i] || 0;
+  });
+
+  if (Math.floor(t * 2) % 2) {
+    deathText(ctx, 'ENTER \u00b7 BACK', MID, ENTER_BASE, ENTER_SIZE);
+  }
+}
+
 export function drawTitle(ctx, t) {
   ctx.fillStyle = BLOOD_RED;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -850,7 +959,8 @@ export function drawTitle(ctx, t) {
   // card's line blinks.  Two colours taking turns was the mono card's trick
   // and there is only one colour on this one.
   if (Math.floor(t * 2) % 2) {
-    deathText(ctx, 'PRESS ENTER \u00b7 MIDNIGHT IS WASTING', MID, ENTER_BASE, ENTER_SIZE);
+    deathText(ctx, 'ENTER \u00b7 MIDNIGHT IS WASTING       ESC \u00b7 BACK',
+              MID, ENTER_BASE, ENTER_SIZE);
   }
 }
 
