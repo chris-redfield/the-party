@@ -10,6 +10,7 @@ import { drawHud, drawTitle, drawEnd, drawPause, cardAt, tipVotes } from './hud.
 import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic } from './audio.js';
 import { loadDeathFonts } from './deathtype.js';
 import { loadBats } from './bats.js';
+import { loadLabel, advanceLabel, drawLabel, labelDone } from './label.js';
 import { loadArtwork } from './artwork.js';
 
 const canvas = document.getElementById('game');
@@ -25,16 +26,31 @@ function fit() {
 window.addEventListener('resize', fit);
 fit();
 
-// The death screen is set in a real typeface, which has to be fetched before
-// anything can be drawn with it.  Nothing waits on this: it is wanted minutes
-// into a night at the earliest, and until it lands the screen sets in serif.
-loadDeathFonts();
-// the sheet behind the winning card; it is never needed in a hurry
-loadBats();
-// The drawn characters - the vampire, the monsters he finds, and one of the
-// children - cut out of their sheets.  Nothing waits on this either: until
-// they land, every one of them is drawn with the placeholder sprites.
-loadArtwork();
+// ---------------------------------------------------------------------------
+// NOTHING MOVES UNTIL EVERYTHING IS READY
+// ---------------------------------------------------------------------------
+// These used to be fired off and forgotten, on the argument that until they
+// land the game draws placeholders and nothing is hurt by waiting.  That was
+// true while the first screen was a static title card.  It stopped being true
+// the moment the first screen became a photograph with vermin crawling over
+// it: cutting the character sheets reads every one of 34 million pixels, twice
+// over, and that landed a second or so in - which is the middle of the
+// fade-in.  Half a second of frozen animation reads as a broken game.
+//
+// So the loading is done FIRST, against a black screen, where a stopped main
+// thread looks like nothing at all, and the label starts on the frame it is
+// all finished.  The typeface is in here because the title card behind the
+// label waits on it anyway.
+//
+// The one thing NOT waited on is the ending's clip - two megabytes wanted
+// minutes from now at the earliest - which is started once the label is gone.
+let ready = false;
+Promise.race([
+  Promise.all([loadLabel(), loadArtwork(), loadDeathFonts()]),
+  // a floor under it, so a sulking asset server cannot hold the game on a
+  // black screen: every one of those falls back on its own anyway
+  new Promise(r => setTimeout(r, 8000)),
+]).then(() => { ready = true; });
 
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
@@ -45,6 +61,12 @@ const citySeed = cityParam == null ? undefined : (hashSeed(cityParam) >>> 0);
 let game = newGame(seedParam || undefined, citySeed);
 let zoomIdx = DEFAULT_ZOOM;
 let paused = false;
+// Seconds the studio label has been up.  `?label=0` starts past it, which is
+// what dev-harness.html and any scripted run want: the label swallows the
+// first press, so a recipe that taps Enter to start the night would otherwise
+// spend that press skipping a label and then sit on the title card.
+let batsStarted = false;
+let labelT = new URLSearchParams(location.search).get('label') === '0' ? 1e9 : 0;
 let last = performance.now();
 
 const cam = makeCamera();
@@ -96,6 +118,29 @@ function frame(now) {
   last = now;
   if (dt > 0.1) dt = 0.1;          // a backgrounded tab should not cost you the night
 
+  // Black, and still, until the art is in.  See above: this is the one place
+  // in the run where the main thread is allowed to stop.
+  if (!ready) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    input.endFrame();
+    requestAnimationFrame(frame);
+    return;
+  }
+
+  // The label comes before everything, including the title card, and it is not
+  // part of the game object: a restart goes back to a fresh night, not back to
+  // the studio's name.
+  if (!labelDone(labelT)) {
+    labelT = advanceLabel(labelT, dt, input.pressed('start') || input.pressed('bat'));
+    drawLabel(ctx, labelT);
+    input.endFrame();
+    requestAnimationFrame(frame);
+    return;
+  }
+  // the label is over: now the ending's clip can have the network to itself
+  if (!batsStarted) { batsStarted = true; loadBats(); }
+
   if (input.pressed('mute')) toggleMute();
   if (input.pressed('zoomIn') && zoomIdx < ZOOMS.length - 1) cam.z = ZOOMS[++zoomIdx];
   if (input.pressed('zoomOut') && zoomIdx > 0) cam.z = ZOOMS[--zoomIdx];
@@ -139,6 +184,10 @@ function frame(now) {
 // A small hatch for tinkering from the browser console.
 window.PARTY = {
   get game() { return game; },
+  /** seconds the studio label has been up, for checking it headlessly */
+  get label() { return labelT; },
+  /** false while the art is still being cut and nothing is allowed to move */
+  get ready() { return ready; },
   get cam() { return cam; },
   /**
    * A/B for the drawn line on the buildings.  `PARTY.ink(false)` puts the old

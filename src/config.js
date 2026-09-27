@@ -153,6 +153,22 @@ export const GLASS_CLOCK_TEXT = false;
 
 // The end of a night is one phrase on a flat red field and nothing else - no
 // prose, no tally of how it went.  Set true to put the stats back under it.
+// --- the screen before the screen -------------------------------------------
+// The studio label that BATIDAO DE COCO opens on, in this game's colours.  The
+// numbers are that game's own, so the two open on the same beat: a press is
+// not taken for the first quarter second, it holds for three, and it goes down
+// into the title over six tenths.  `on` false and the game opens on the title
+// card the way it used to.  See src/label.js.
+export const LABEL = {
+  on: true,
+  hold: 3.0,        // seconds up before it leaves by itself
+  fadeIn: 0.4,      // up out of black
+  fadeOut: 0.6,     // down into the title card
+  arm: 0.25,        // before a press counts
+  frame: 0.105,     // one photograph of the crawl - about 9.5 a second
+  wide: 0.52,       // how much of the screen the label spans
+};
+
 export const END_STATS = false;
 
 // --- what is behind the right door ------------------------------------------

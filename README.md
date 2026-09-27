@@ -23,6 +23,58 @@ python3 -m http.server 8080
 
 Any static server works. Drop the folder on itch.io / GitHub Pages as-is.
 
+`?label=0` starts past the studio label, which is what any scripted or
+headless run wants — see below. `?seed=` and `?citySeed=` are the other two.
+
+### The screen before the screen
+
+**The game opens on the studio's label, not on its own title.** It is the same
+screen BATIDÃO DE CÔCO opens on — a compost heap with vermin crawling over it
+and SABOROSA across the middle — so the two games open the same way, and it
+keeps that game's own timing to the millisecond: a quarter of a second before a
+press counts, three seconds up, six tenths going down into the title card.
+
+What it does not keep is its colours. **The heap and everything crawling on it
+come in grey, and the label comes in the blood this game is made of** — the
+drawing's own shading carried up a black-to-`#cf1206` ramp, so the outline and
+the three flat colours inside it still read, in the one colour this game has.
+Both are done to the art before it ships, by `preview/intro-prep.py`, rather
+than in the browser: the photographs are 3002 × 1687 against a 1280 × 720
+canvas, so shipping them at source size would be five and a half times the
+pixels for no picture, and re-tinting fifteen million of them at every launch
+for a screen that lasts three seconds is worse. Three frames on a 105 ms hold,
+about 9.5 a second, looping — the same rate that game crawls them at.
+
+**It leaves on its own and the title card does not.** That asymmetry is the
+point of having two screens rather than two things to dismiss: this one is a
+label being shown to you, the title is where the game waits for you. A press
+skips it, but not for the first `LABEL.arm` — it is the first screen of the
+session and a key still down from launching the game would blow through it
+before it had drawn twice.
+
+**Everything is loaded before it starts, and that is not an optimisation, it
+is the whole reason it runs at all.** Cutting the character sheets reads every
+one of 34 million pixels twice over — once to find the ink, once to flood the
+background away and trim — and that used to happen whenever the sheets
+happened to land, a second or so in. That was invisible while the first screen
+was a static title card and it was half a second of frozen photograph the
+moment the first screen started moving. So `main.js` waits on the label's four
+pictures (decoded, not merely fetched — the first `drawImage` of an undecoded
+photograph decodes it on the spot), the character sheets and the typeface, all
+against a black screen where a stopped main thread looks like nothing at all,
+and the label begins on the frame that finishes. Eight seconds is the floor
+under the wait, so a sulking asset server cannot hold the game on black.
+
+The ending's clip is the one thing not waited on — two megabytes wanted minutes
+from now at the earliest — and it is started once the label is gone, so it is
+not competing for the network with the pictures that are on screen now.
+
+**It is also the one place in the game that fades.** Everything drawn over the
+city is flat and opaque and stops rather than thins; this is not over the city,
+it is a screen arriving, and cutting to a full-brightness photograph from black
+reads as the page having jumped. `LABEL` in `src/config.js` holds all of it and
+`LABEL.on` false opens on the title card the way it used to.
+
 ## Controls
 
 | key | |
@@ -107,12 +159,32 @@ part of the city becomes unreachable on foot, and a crossing is only
 city on an 8-pixel grid, over four different nights, says the pumpkins take
 about 2% of the pavement and leave it in exactly one piece.
 
-**And they are not cute in the other light.** In ordinary sight a pumpkin is
-the same cheerful gourd that sits beside the doors, lit from inside, grinning.
-Once the changeover is half done it is a dark thing with a fire in it and a
-mouth full of teeth — a hard swap at the halfway mark, the same trick the
-street lamps play when they turn out to have been torches all along, because a
-pumpkin dissolving into another pumpkin reads as a rendering fault.
+**And they are not cute in the other light.** In ordinary sight a pumpkin is a
+cheerful gourd, lit from inside, grinning. Once the changeover is half done it
+is a grey thing with a red fire in it and a mouth full of teeth — a hard swap
+at the halfway mark, the same trick the street lamps play when they turn out to
+have been torches all along, because a pumpkin dissolving into another pumpkin
+reads as a rendering fault.
+
+**Both of them are drawings**, `assets/pumpkins.png`: a row per variation and
+two columns, the left one ordinary sight and the right one what a cat's eyes
+find. The seed that used to only tilt a pumpkin now picks which row it is, so
+the ones in the street are four different pumpkins rather than one drawn four
+ways — add a fifth row to the sheet and a fifth pumpkin joins the street with
+no code change, the same way a fifth beast would. The sheet is cut by looking
+for its empty rows and empty columns rather than by dividing it up, so the
+drawings may sit anywhere on it at any spacing; the one rule is a clear row
+between two rows of them and a clear column between the two columns. The two
+columns are **not** the same size — the vision drawings are about 8% wider than
+their ordinary twins, which is how they were drawn, and the changeover keeps
+that difference rather than flattening it.
+
+The pumpkin drawn out of code is still in `drawStreetPumpkin`, underneath, and
+is what you get if the sheet does not load. Unlike the shadow beasts, which are
+their drawing or nothing, a thing you can walk into has to be visible whatever
+happened to the art. **The pumpkin hanging by a door is a different pumpkin**
+and is untouched: that one is a clue value (`deco`), it is drawn out of code,
+and changing how it looks would change what a tip means.
 
 **Wrong doors are the only place candy comes from.** Children never give you
 any; they want yours. Knock on a house that is not the party and somebody hands
@@ -691,6 +763,7 @@ src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
 src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
+src/label.js        the studio's label, which is the first thing on screen
 src/bats.js         the room behind the right door: the clip that plays
                     under the winning card, and its still-image fallback
 src/audio.js        procedural sound, and the one recorded thing there is:
@@ -725,6 +798,13 @@ nobody notices. The sheet faces left, so it is the cat walking right that is
 mirrored, and which way it faces is taken from the ground it covers rather
 than from `dir` (that is which way round the block it is going, and a block
 has four sides).
+
+`assets/pumpkins.png` is the street pumpkins, and it is the other sheet cut by
+its own empty space rather than on a pitch — but in both directions, so it
+comes out as rows of variations by columns of ways-of-seeing. `PUMPKIN_BOX` is
+17 art pixels, which is not a judgement call either: it is the height the coded
+pumpkin already stood at, so the drawing arrives the size the obstacle was and
+`PUMPKIN_BLOCK` still means what it says.
 
 `updateCat()` gives it the three states the sheet is drawn for: it sits, it
 gets up, and it **holds that standing pose for `CAT_RISE` — a second to a

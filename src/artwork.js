@@ -56,6 +56,18 @@ const CHILD_SHEETS = [
 // the mirrored one.
 const CAT_SHEET = 'assets/party-cat-01.png';
 
+// The pumpkins standing in the street - the ones you walk into, not the one
+// hung by a door, which is a clue and is still drawn out of code.
+//
+// The sheet is a grid of drawings with space around them: down is one
+// variation per row, and across is the two ways of seeing the same pumpkin -
+// the left column is the ordinary gourd, the right is what it turns out to
+// have been all along.  Neither the rows nor the columns are on a pitch, so
+// it is cut the way the beasts are, by looking for the empty rows and empty
+// columns, in both directions.  Add a fifth row and a fifth pumpkin joins the
+// street without a line of code changing.
+const PUMPKIN_SHEET = 'assets/pumpkins.png';
+
 // And the things that follow the children about.  Four of them, one under the
 // other, and they are the one sheet in here that is not on a grid: they are
 // different animals at different sizes, so the cells are found by looking for
@@ -67,6 +79,12 @@ const BEAST_SHEET = 'assets/party-shadow%20beasts-01.png';
 // The trick-or-treaters are 28 and he is a little over them - he is the one
 // adult out here, and the cape needs the room.
 export const VAMP_BOX = 33;
+// A street pumpkin, in the same art pixels.  It is not a judgement call
+// either: it is the height the coded one stands at, which is 1.64 x PUMPKIN_R
+// in world pixels over PX of them per art pixel - so the drawing arrives the
+// size the thing you walk into already was, and the collision radius in
+// config.js still means what it says.
+export const PUMPKIN_BOX = 17;
 // The monsters you meet are drawn at a different size on their own sheets, so
 // the box is what puts them in proportion to each other rather than in
 // proportion to whatever the files happened to be exported at.
@@ -136,6 +154,7 @@ export async function loadArtwork() {
       .then(adoptChildren),
     sheet('cat', CAT_SHEET, 1, 4),
     sheet('beast', BEAST_SHEET),          // no grid: cut at the empty rows
+    sheet('pumpkin', PUMPKIN_SHEET, 'bands'),   // ... and at the empty columns
   ]);
 }
 
@@ -147,7 +166,8 @@ async function sheet(name, url, cols, rows) {
       img.onerror = () => rej(new Error(`${url} did not load`));
       img.src = url;
     });
-    sheets[name] = cols ? cut(img, cols, rows) : cutBands(img);
+    sheets[name] = cols === 'bands' ? cutGrid(img)
+      : cols ? cut(img, cols, rows) : cutBands(img);
   } catch (e) {
     console.warn(`artwork: ${e.message} - falling back to the drawn sprite`);
   }
@@ -220,6 +240,19 @@ function cut(img, COLS, ROWS) {
 function cutBands(img) {
   const { rows } = inkLines(img);
   return cutRects(img, runs(rows).map(([y, h]) => [{ x: 0, y, w: img.width, h }]));
+}
+
+/**
+ * A grid found rather than divided: the empty rows cut the sheet into rows and
+ * the empty columns cut those into cells, so a sheet drawn with whatever
+ * spacing the artist liked comes out as grid[row][col] anyway.  Same one rule
+ * as cutBands, in both directions: a clear row between two rows of drawings,
+ * a clear column between two columns of them.
+ */
+function cutGrid(img) {
+  const { rows, cols } = inkLines(img);
+  const cb = runs(cols);
+  return cutRects(img, runs(rows).map(([y, h]) => cb.map(([x, w]) => ({ x, y, w, h }))));
 }
 
 /**
@@ -460,6 +493,30 @@ export function catArt(pose, step, faceLeft, scale) {
  * there at all, which is the right answer for something you can only see
  * through a cat's eyes anyway.
  */
+/**
+ * One of the street pumpkins.  `seed` picks the variation - modulo however
+ * many rows the sheet turned out to hold - and `evil` picks the column: the
+ * ordinary gourd or the thing it is under a cat's eyes.  There is no blend
+ * between the two columns and there is not meant to be; see drawStreetPumpkin.
+ *
+ * Returns null if the sheet did not load, and the coded pumpkin is drawn
+ * instead - unlike the beasts, this one has a stand-in, because a pumpkin you
+ * can walk into has to be visible whatever happened to the art.
+ */
+export function pumpkinArt(seed, evil, scale) {
+  const sh = sheets.pumpkin;
+  if (!sh) return null;
+  const rows = sh.grid.length;
+  const row = ((seed % rows) + rows) % rows;
+  const cols = sh.grid[row];
+  const col = evil ? Math.min(1, cols.length - 1) : 0;
+  const cell = cols[col];
+  if (!cell) return null;
+  return scaled(`pumpkin|${row}|${col}`, cell, sh, PUMPKIN_BOX, false, scale);
+}
+
+export const pumpkinArtReady = () => !!sheets.pumpkin;
+
 export function beastArt(seed, faceLeft, scale) {
   const sh = sheets.beast;
   if (!sh) return null;

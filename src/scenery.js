@@ -17,7 +17,8 @@
 // city to grey and sets the lit things burning: every colour below comes out
 // of `C`, and the textures tint themselves against whatever is under them.
 // ---------------------------------------------------------------------------
-import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R, INK } from './config.js';
+import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R, PX, INK } from './config.js';
+import { pumpkinArt } from './artwork.js';
 import { inkBox, inkLine, INK_COLOR } from './ink.js';
 import { makeRng } from './rng.js';
 import { C, MIX, lerpHex } from './palette.js';
@@ -655,6 +656,12 @@ export function drawGround(ctx, o, tiles, city) {
 // changeover it is the same cheerful gourd that sits by the doors; above it,
 // it is a dark thing with a fire inside and a mouth full of teeth.  Same trick
 // the street lamps play when they turn out to have been torches all along.
+//
+// It is a drawing now - `assets/pumpkins.png`, a row per variation and a
+// column per way of seeing - and `seed` is which variation this one is, the
+// same seed that used to only tilt it.  What is below is the coded pumpkin,
+// kept as the stand-in for a sheet that did not load: unlike the beasts, a
+// thing you can walk into has to be drawn whatever happened to the art.
 const PUMPKIN_SINISTER = 0.5;
 
 export function drawStreetPumpkin(ctx, px, py, o, seed) {
@@ -664,11 +671,22 @@ export function drawStreetPumpkin(ctx, px, py, o, seed) {
   const evil = MIX.scene >= PUMPKIN_SINISTER;
   const wob = ((seed % 7) - 3) * 0.012;            // no two sit quite the same
 
-  // the dark it puts on the pavement
+  // the dark it puts on the pavement.  The drawing does not carry its own, and
+  // it is what sits it on the ground rather than floating over it.
   ctx.fillStyle = C.coreShadow;
   ctx.beginPath();
   ctx.ellipse(sx, sy, r * 1.02, r * 0.3, 0, 0, 6.2832);
   ctx.fill();
+
+  const cv = pumpkinArt(seed, evil, PX * z);
+  if (cv) {
+    ctx.imageSmoothingEnabled = false;
+    // round the position and the anchor apart, never their sum - the anchor is
+    // a property of the drawing and must not drag a moving position's rounding
+    ctx.drawImage(cv, Math.round(sx) - Math.round(cv.anchorX),
+                  Math.round(sy) - Math.round(cv.anchorY));
+    return;
+  }
 
   const cy = sy - r * 0.76;                        // it sits ON the ground
   // stalk first, so the body covers where it goes in
