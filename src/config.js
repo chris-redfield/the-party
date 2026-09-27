@@ -228,7 +228,11 @@ export const INTRO = {
   cps: 28,          // characters a second, typing themselves out
   arm: 0.4,         // before a press may finish the line, or skip the intro
   giveUp: 6,        // seconds to wait for the drawings before starting anyway
-  name: 'YOU',
+  // Nobody is named over the intro.  It was 'YOU', which is a caption on a
+  // drawing of yourself - the box says who is talking, and over the intro the
+  // answer is already the whole screen.  Put a string back and it returns,
+  // with the line dropping to make room for it.
+  name: '',
   line: 'I wonder where is my invitation for this year\u2019s party. ' +
         'I hope this has nothing to do with last year\u2019s incident ' +
         'with the hostess.',

@@ -343,9 +343,17 @@ export function drawSpeech(ctx, name, text, hint, nameColor, reveal) {
   const x = VIEW_W / 2 - boxW / 2, y = VIEW_H - boxH - 28;
   panel(ctx, x, y, boxW, boxH, 0.9);
   ctx.textAlign = 'left';
-  ctx.font = FONT(15);
-  ctx.fillStyle = nameColor || '#c9a8ff';
-  ctx.fillText(name, x + 22, y + 28);
+  // A name, if anybody is saying it.  The intro is nobody: the man on the
+  // drawing is you, and a box captioned YOU over a picture of yourself is the
+  // one thing on that screen you have to read twice to place.  With no name
+  // the line simply starts where the name was, rather than leaving a blank
+  // first row - an empty caption reads as a missing one.
+  let ty0 = y + 56;
+  if (name) {
+    ctx.font = FONT(15);
+    ctx.fillStyle = nameColor || '#c9a8ff';
+    ctx.fillText(name, x + 22, y + 28);
+  } else ty0 = y + 34;
   ctx.font = FONT(18, false);
   ctx.fillStyle = '#efe6fa';
   // `reveal` is how many characters of it have arrived - the line types itself
@@ -353,9 +361,9 @@ export function drawSpeech(ctx, name, text, hint, nameColor, reveal) {
   // the part of it that has arrived reflows the box on the letter that tips a
   // word onto the next line, and words jump about while you are reading them.
   if (reveal == null) {
-    wrap(ctx, text, x + 22, y + 56, boxW - 44, 24);
+    wrap(ctx, text, x + 22, ty0, boxW - 44, 24);
   } else {
-    let left = reveal, ty = y + 56;
+    let left = reveal, ty = ty0;
     for (const line of wrapLines(ctx, text, boxW - 44)) {
       if (left <= 0) break;
       ctx.fillText(left >= line.length ? line : line.slice(0, left), x + 22, ty);

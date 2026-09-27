@@ -565,7 +565,13 @@ replay the studio label.
 
 **He talks over it**, in the same box the monsters talk in on the pavement,
 because it is the same man talking — `drawSpeech()` is split out of the
-dialogue box for exactly that. The line types itself out a character at a
+dialogue box for exactly that. **Nobody is named on it.** A speech box says
+who is speaking, and over the intro the answer is already the whole screen; it
+said YOU, which is a caption on a drawing of yourself. With no name the line
+starts where the name was rather than leaving a blank first row, because an
+empty caption reads as a missing one. `INTRO.name` puts one back, and the line
+drops to make room for it; a monster on the pavement is unaffected and still
+gives its name. The line types itself out a character at a
 time at `INTRO.cps`. It is **wrapped whole and then cut, never wrapped as it
 grows**: wrapping the part that has arrived reflows the box on the letter that
 tips a word onto the next line, and words jump about while you are reading
