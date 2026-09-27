@@ -991,11 +991,20 @@ function drawDoor(ctx, door, o) {
 // and then checked against the room there actually is.
 export function drawBuilding(ctx, block, o, city, t) {
   const { z } = o;
-  // the dark the whole mass puts on the pavement around itself, once for the
-  // block - there is no daylight between two buildings that share a wall
-  ctx.fillStyle = C.coreShadow;
-  ctx.fillRect(o.ox + (block.cx0 - 7) * z, o.oy + (block.cy0 - 7) * z,
-               (block.cx1 - block.cx0 + 14) * z, (block.cy1 - block.cy0 + 14) * z);
+  // The dark the whole mass puts on the pavement around itself, once for the
+  // block - there is no daylight between two buildings that share a wall.
+  //
+  // This rectangle was the last straight line in the city, and it was the
+  // most visible one: 7px of hard black proud of the core on all four sides,
+  // which reads as the building's OUTER EDGE.  Every drawn line inside it was
+  // landing within a crisp black frame, so the block still had a ruled
+  // silhouette however carefully its facades were inked.  With the ink on it
+  // is not drawn at all - the block gets a real outline instead, below.
+  if (!INK.on) {
+    ctx.fillStyle = C.coreShadow;
+    ctx.fillRect(o.ox + (block.cx0 - 7) * z, o.oy + (block.cy0 - 7) * z,
+                 (block.cx1 - block.cx0 + 14) * z, (block.cy1 - block.cy0 + 14) * z);
+  }
   // A block may be a thousand pixels across and run off both sides of the
   // screen, so the buildings on it are culled one at a time rather than all
   // together.  The margin covers the stoop, the decoration and the shadow.
@@ -1003,6 +1012,28 @@ export function drawBuilding(ctx, block, o, city, t) {
     if (o.ox + (plot.x1 + 32) * z < 0 || o.ox + (plot.x0 - 32) * z > VIEW_W) continue;
     if (o.oy + (plot.y1 + 48) * z < 0 || o.oy + (plot.y0 - 32) * z > VIEW_H) continue;
     drawPlot(ctx, plot, block, o, t);
+  }
+  // The silhouette of the whole block, drawn LAST and over every facade on it.
+  //
+  // It has to be last and it has to be per block, not per plot.  Buildings
+  // here stand wall to wall and are painted back to front, so a plot's own
+  // left and right edges are immediately covered by its neighbour's fill -
+  // the ink was being drawn and then painted over, which is the other half of
+  // why the outer edge looked ruled.  One line round the outside, after
+  // everything, is also simply what a hand does: you draw the block, then the
+  // buildings in it.
+  //
+  // The foot is left open.  A line along the bottom would cut straight across
+  // every doorstep sticking out of the facades - and the plinth line on each
+  // building already reads as where it meets the pavement.
+  if (INK.on) {
+    const X0 = o.ox + block.cx0 * z, Y0 = o.oy + block.cy0 * z;
+    const BW = (block.cx1 - block.cx0) * z, BH = (block.cy1 - block.cy0) * z;
+    if (X0 + BW > -40 && X0 < VIEW_W + 40 && Y0 + BH > -40 && Y0 < VIEW_H + 40)
+      inkBox(ctx, X0, Y0, BW, BH,
+             INK.weight * z * 1.5,          // the heaviest line in the city
+             block.id * 2654435761 % 100003, // its own seed, stable per block
+             INK.wobble * z * 1.35, INK.over * z * 1.2, 'b', z);
   }
 }
 

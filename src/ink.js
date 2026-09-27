@@ -62,9 +62,16 @@ function edgeShape(seed, edge, wlen, wobble) {
   const key = `${seed}|${edge}|${Math.round(wlen)}|${wobble}`;
   let s = OFFSETS.get(key);
   if (s) return s;
-  // one control point roughly every 40 world px, never fewer than 3 - two
-  // points is a straight line with a tilt, which is not a wobble at all
-  const n = Math.max(3, Math.min(9, Math.round(wlen / 40) + 2));
+  // One control point roughly every 45 world px, never fewer than 3 - two
+  // points is a straight line with a tilt, which is not a wobble at all.
+  //
+  // The ceiling has to be high enough for the longest line in the city, which
+  // is a whole block's silhouette and can run 600+ world px.  Capped at 9 it
+  // drifted about 7px across the entire wall - measurably not straight, and
+  // to the eye still a ruled line, because one lazy bend over 600px is not a
+  // wobble.  The cost is bounded anyway: only a handful of edges are ever
+  // this long, and windows still come out at the floor of 3.
+  const n = Math.max(3, Math.min(20, Math.round(wlen / 45) + 2));
   const pts = [];
   for (let i = 0; i < n; i++) {
     const r1 = hash2(seed * 31 + edge, i * 7 + 1);
@@ -107,7 +114,13 @@ export function inkEdge(ctx, x0, y0, x1, y1, weight, seed, edge, wobble, over = 
   const o1 = over * (0.35 + hash2(seed, edge * 3 + 47) * 0.9);
   const ax = x0 - ux * o0, ay = y0 - uy * o0;
   const L = len + o0 + o1;
-  const pts = edgeShape(seed, edge, len / unit, 1);   // world px, so zoom-stable
+  const wlen = len / unit;                           // world px, so zoom-stable
+  const pts = edgeShape(seed, edge, wlen, 1);
+  // A hand holds a short line true and lets a long one get away from it.  A
+  // window frame keeps the wobble it was tuned with; a block-long wall gets
+  // up to three times as much, which is what stops the biggest shapes in the
+  // city reading as ruled while every small one still looks deliberate.
+  const wob = wobble * (1 + Math.min(2, wlen / 300));
 
   const P = (t, side) => {
     const s = pts[0];
@@ -116,7 +129,7 @@ export function inkEdge(ctx, x0, y0, x1, y1, weight, seed, edge, wobble, over = 
     while (i < pts.length - 2 && pts[i + 1].t < t) i++;
     const a = pts[i], b = pts[i + 1];
     const f = b.t === a.t ? 0 : (t - a.t) / (b.t - a.t);
-    const off = (a.off + (b.off - a.off) * f) * wobble;
+    const off = (a.off + (b.off - a.off) * f) * wob;
     const w = (a.w + (b.w - a.w) * f) * weight * 0.5;
     const cx = ax + ux * (t * L), cy = ay + uy * (t * L);
     return [cx + nx * (off + side * w), cy + ny * (off + side * w)];
