@@ -203,21 +203,44 @@ else but the line telling you which key starts another night.
 **Winning is the same card with the party behind it.** Lose and the red is
 flat, because there is nothing behind it. Win and it is the room the door
 opened on: bats hanging in a row and swaying, on a loop. It is footage, not
-drawing — `assets/bats-win.png`, seventy-two frames of a bat colony laid out in
+drawing — `assets/bats-win.png`, fifty-four frames of a bat colony laid out in
 a strip — but it is flattened to four flat tones of the card's own blood and
 dropped onto the game's art pixel, so it arrives as a poster rather than as a
-video playing in a window. Two things make it read as drawn rather than as
-compressed: the tone bands are decided **once over the whole clip** (per frame
-they crawl and the picture boils), and it runs at `WIN_BATS_FPS` 12 rather than
-the 30 it was shot at. The phrase waits `WIN_BATS_TEXT` seconds, so you get the
+video playing in a window. Three things make it read as drawn rather than as
+compressed: the tone bands are decided **once over the whole cut** (per frame
+they crawl and the picture boils), every frame is first pulled onto a common
+exposure, and it runs at `WIN_BATS_FPS` 12 rather than the 30 it was shot at.
+
+That middle one is not optional. The footage is not evenly lit — there are
+lightning hits at 0:19 and 1:04, a red-tinted stretch from 0:33 to 0:41, a
+frame at 1:12 that goes to pure white, and a dozen smaller flashes — and a
+flash lands every pixel of the frame above the same band edge, so the picture
+becomes one solid slab of colour. `preview/quantize.py` therefore matches each
+frame's tone distribution onto the clip's own before it bands anything, and any
+frame with no contrast left in it at all is dropped and the frame before it
+held in its place. Cutting the same four and a half seconds with `--regularise 0` shows
+what it is for. The cut that ships overlaps the flash at 0:46, so it needs this
+as much as the lightning does. The phrase waits `WIN_BATS_TEXT` seconds, so you get the
 room before you get told, and then it is set in black haloed in the blood —
 `WIN_TYPE`, which is `'outline'`. The other setting is `'invert'`, which cuts
 the phrase out of whatever it lands on by drawing it in the red under
 `difference`: red comes out black, black comes out red, and it is the more
 striking of the two on a frame with a flat field behind it and close to
 unreadable on a frame that is all middle tones. `WIN_BATS` false puts the win
-back on the flat card. The strip costs 509 kB; the footage it came out of is
-29 MB and does not ship.
+back on the flat card. The strip costs 414 kB; the footage it came out of is
+29 MB, is not in the repo, and does not ship.
+
+`assets/bats-ending.mp4` is the same treatment applied to a longer cut — source
+0:06 to 0:45, 39 seconds, 468 frames, 2 MB — kept in the repo because the
+ending is going to use it. Nothing loads it yet.
+
+To cut a different piece: `python3 preview/quantize.py --in 6 --len 39 --mp4
+assets/bats-ending.mp4` bands a stretch into something you can scrub in
+`preview/scrub.html` (`i` and `o` mark a piece, `c` copies the command that
+cuts it; it writes a sidecar `.json` so the page reports times in *source*
+time rather than in its own). The same script with `--sheet
+assets/bats-win.png` writes the strip the win card loads. It prints the four
+`WIN_BATS_*` numbers to paste into `src/config.js` if the shape changes.
 
 A phrase of one word fills the width; a phrase of several stacks a word to a
 line and fills the height instead, and either way it is measured and scaled

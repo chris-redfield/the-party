@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><title>the ending clip, in the game's look</title>
+<style>
+ body{margin:0;background:#0a0a0c;color:#8a8a96;font:13px monospace;display:flex;
+      flex-direction:column;align-items:center;gap:10px;padding:12px}
+ video{image-rendering:pixelated;width:1278px;max-width:98vw;border:1px solid #222;background:#000}
+ b{color:#cf1206} #t{font-size:15px;color:#d8d8e0}
+</style></head><body>
+<video id="v" src="../assets/bats-ending.mp4" controls loop autoplay muted></video>
+<div id="t">0.0 s</div><div id="meta" style="color:#5c5c6a"></div>
+<div>regularised, then banded - times are source times &nbsp;&nbsp; <b>&larr; &rarr;</b> one frame
+ &nbsp; <b>,</b> <b>.</b> one second &nbsp; <b>space</b> play/pause &nbsp; <b>c</b> copy the cut command</div>
+<div id="cut" style="color:#5c5c6a">in: — &nbsp; out: — &nbsp; <b>i</b> / <b>o</b> to mark</div>
+<script>
+const v = document.getElementById('v');
+let F = 1/12, OFF = 0, mi = null, mo = null;
+// this copy may start part way into the footage; everything shown and every
+// command written out is in SOURCE time, so the numbers can be used directly
+fetch('../assets/bats-ending.mp4.json').then(r => r.json()).then(m => {
+  OFF = m.in || 0; F = 1 / (m.fps || 12);
+  document.getElementById('meta').textContent =
+    `${m.frames} frames from ${OFF}s on, ${m.fps} fps, ${m.px} px, ${m.tones} tones`
+    + (m.held ? `, ${m.held} flashed-out frames held` : '');
+}).catch(() => {});
+const src = () => v.currentTime + OFF;
+setInterval(() => { document.getElementById('t').textContent = src().toFixed(2)+' s'; }, 80);
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') { v.pause(); v.currentTime += F; }
+  if (e.key === 'ArrowLeft')  { v.pause(); v.currentTime -= F; }
+  if (e.key === '.') { v.pause(); v.currentTime += 1; }
+  if (e.key === ',') { v.pause(); v.currentTime -= 1; }
+  if (e.code === 'Space') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  if (e.key === 'i') mi = src();
+  if (e.key === 'o') mo = src();
+  if (e.key === 'c' && mi !== null) {
+    const len = ((mo ?? src()) - mi).toFixed(1);
+    const cmd = `python3 preview/quantize.py --in ${mi.toFixed(1)} --len ${len}`
+              + ` --sheet assets/bats-win.png`;
+    navigator.clipboard && navigator.clipboard.writeText(cmd);
+    document.getElementById('cut').textContent = cmd + '   (copied)';
+    return;
+  }
+  document.getElementById('cut').innerHTML =
+    'in: ' + (mi === null ? '—' : mi.toFixed(1)+'s') +
+    ' &nbsp; out: ' + (mo === null ? '—' : mo.toFixed(1)+'s') +
+    ' &nbsp; <b>i</b> / <b>o</b> to mark, <b>c</b> to copy the cut command';
+});
+</script></body></html>

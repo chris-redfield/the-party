@@ -165,7 +165,7 @@ export const WIN_BATS = true;
 export const WIN_BATS_FPS = 12;        // footage is 30; 12 is where it reads as drawn
 export const WIN_BATS_W = 426;         // one frame, in art pixels (x3 on screen)
 export const WIN_BATS_H = 240;
-export const WIN_BATS_N = 72;          // six seconds of it, looping
+export const WIN_BATS_N = 54;          // four and a half seconds of it, looping
 export const WIN_BATS_COLS = 8;        // how the strip is wrapped in the sheet
 export const WIN_BATS_TEXT = 1.4;      // seconds of bats before the phrase cuts in
 // How the phrase sits on the bats - 'invert' cuts it out of whatever is under
