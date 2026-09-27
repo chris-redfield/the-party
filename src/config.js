@@ -157,6 +157,26 @@ export const GLASS_CLOCK_TEXT = false;
 // in a rectangle is a widget.  Set true to put the two boxes back.
 export const HUD_PANELS = false;
 
+// --- the back of a block -----------------------------------------------------
+// The block's back building used to get a row of upper-storey windows on its
+// north face.  There is no north face on screen: this view folds the SOUTH
+// wall down towards the camera and looks at the roof from above, so the back
+// wall points away and the windows landed flat on the gravel inside the
+// parapet.  `on` puts them back - and they will be lying on the roof again.
+// Live, so the two can be flipped between while looking at the same roof:
+// `PARTY.backWindows(true)`.  Giving the block a real back would mean folding
+// the north wall UP, above the roofline and into the road behind it, which is
+// a different city.
+export const BACK_WINDOWS = { on: false };
+
+// The glass in a roof.  Not a geometry mistake the way the north face was - a
+// roof may perfectly well have skylights - but they were drawn as a 36x24 box
+// with one vertical glazing bar in the lit-window yellow, which is a wall
+// window in every readable respect, so they came out too.  The roof keeps its
+// tar-paper seams, its puddle, its air handling units, its water tank, its
+// hatch and its vent pipe.  `on` puts the glass back.
+export const SKYLIGHTS = { on: false };
+
 // --- how the hourglass is drawn ---------------------------------------------
 // `ink: false` puts the old flat pixel-art hourglass back (src/hourglass-pixel
 // .js) so the two can be looked at side by side - evaluation furniture, and it

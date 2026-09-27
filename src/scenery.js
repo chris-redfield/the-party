@@ -17,7 +17,7 @@
 // city to grey and sets the lit things burning: every colour below comes out
 // of `C`, and the textures tint themselves against whatever is under them.
 // ---------------------------------------------------------------------------
-import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R, PX, INK } from './config.js';
+import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R, PX, INK, BACK_WINDOWS, SKYLIGHTS } from './config.js';
 import { pumpkinArt } from './artwork.js';
 import { inkBox, inkLine, INK_COLOR } from './ink.js';
 import { makeRng } from './rng.js';
@@ -1152,11 +1152,27 @@ function drawPlot(ctx, plot, block, o, t) {
     ctx.fill();
   }
 
-  // skylights, as many as the frontage has room for
+  // SKYLIGHTS, and why there are none.
+  //
+  // A roof is allowed glass in it - these were not a mistake the way the north
+  // face was.  They were taken out because of how they READ: 36x24, one
+  // vertical glazing bar, filled with `litSkylight`, which is a hair off the
+  // yellow of a lit wall window.  So a skylight had a window's colour, a
+  // window's proportion and a window's mullion, and nothing on it said "this
+  // one is lying flat" - it looked like a window that had fallen over onto the
+  // gravel, which is exactly what the north-face row actually was.  Two
+  // different causes, one look, and the look is what matters.
+  //
+  // The loop still runs.  `rr` and `rng.chance` come off the same stream as
+  // every later roll on this building, and `inkN` seeds the wobble of every
+  // later drawn box on this roof, so both have to go on being spent or taking
+  // the glass out would walk the whole city one step along.  Roll, count, draw
+  // nothing.  `SKYLIGHTS.on` puts them back exactly as they were.
   for (let i = 0; i < 4; i++) {
     const sx2 = x0 + 26 + i * 110, sy2 = y0 + 30 + rr(0, 26);
     if (sx2 + 40 > x1 - 10 || sy2 + 28 > deck - 6) break;
     const lit = rng.chance(0.45);
+    if (!SKYLIGHTS.on) { if (ID) inkN += 3; continue; }   // the box() not drawn
     D(X(sx2 - 2), Y(sy2 - 2), 40 * z, 28 * z, 3 * z, 4 * z);
     if (!ID) {
       ctx.fillStyle = C.skylightFrame;
@@ -1267,13 +1283,27 @@ function drawPlot(ctx, plot, block, o, t) {
     inkLine(ctx, X(x1 - P), Y(y0 + P), X(x1 - P), Y(y0 + rh / z), IW * 0.6, sd + 13, 26, IB * 0.8, 0, z);
   }
 
-  // upper storeys on the north face, so the block has a back as well as a
-  // front - but only on the building at the back, since anything in front of
-  // it is looking at that building's wall and not at the sky
+  // THE NORTH FACE, WHICH YOU CANNOT SEE.
+  //
+  // These were upper storeys on the back of the block, "so the block has a
+  // back as well as a front".  It cannot have one: this view folds a
+  // building's SOUTH wall down towards the camera and shows the roof from
+  // above, so the north wall faces away and there is nowhere on screen for it
+  // to go.  Drawn at `y0 + 14` it was not a back wall at all - it was a row
+  // of windows lying flat on the gravel, just inside the parapet, on every
+  // block's back building.  A roof with windows in it reads as a drawing
+  // mistake, and it is one.
+  //
+  // The roll stays where it is, deliberately.  `rng` is one stream shared by
+  // everything in this function, so skipping twenty `chance()` calls would
+  // walk every facade's lit windows, string course and decoration on every
+  // back building in the city one step along - a whole-city reshuffle to
+  // remove a row of windows.  Roll and throw it away; only the drawing goes.
   if (plot.y0 === block.cy0) for (let c = 0; c < 20; c++) {
     const wx = x0 + 16 + c * 40;
     if (wx + 22 > x1 - 10) break;
     const lit = rng.chance(0.4);
+    if (!BACK_WINDOWS.on) continue;
     if (!ID) {
       ctx.fillStyle = C.doorReveal;
       ctx.fillRect(X(wx - 1), Y(y0 + 13), 24 * z, 16 * z);

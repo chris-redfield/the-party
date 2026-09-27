@@ -145,6 +145,35 @@ the middle of a block is a door nobody can knock on. That comes out at about
 eighty blocks, a hundred and fifty buildings and a hundred and twenty-five red
 doors. Exactly one of them, chosen at random each night, is the party.
 
+**A building has one face, and it faces south.** This view folds a building's
+south wall down towards the camera and looks at its roof from above, so the
+north wall points away and there is nowhere on screen for it to be drawn. The
+back building on a block used to get a row of upper-storey windows anyway, at
+`y0 + 14` — which is not a back wall, it is a row of windows lying flat on the
+gravel just inside the parapet, and that is how it looked. They are gone.
+`BACK_WINDOWS.on` in `src/config.js` (or `PARTY.backWindows(true)`) puts them
+back for one look at why. Giving a block a real back would mean folding the
+north wall *up*, above the roofline and into the road behind it, which is a
+different city.
+
+**And there is no glass in a roof either.** The skylights were not a mistake
+in the way the north face was — a roof may perfectly well have glass in it —
+but they were drawn as a 36x24 box with one vertical glazing bar in the
+lit-window yellow, which is a wall window in colour, in proportion and in
+mullion, with nothing on it to say it was lying flat. Two different causes,
+one look, and the look is what matters, so they came out too
+(`SKYLIGHTS.on` / `PARTY.skylights(true)`). A roof now carries its tar-paper
+seams, a puddle, up to two air handling units, a water tank, a hatch and a
+vent pipe, and nothing on it reads as a window.
+
+**Both dials keep spending what they would have spent.** `drawPlot` runs off
+one `rng` stream and one running ink seed (`inkN`), both shared with
+everything drawn after them on that building, so the loops still roll, still
+count and still advance — they simply draw nothing. Turning either dial
+therefore moves those pixels and no others: measured in a single page load,
+the back windows are 1,612 pixels and the skylights 7,176, and in both cases
+every changed pixel lies inside a roof band and none outside it.
+
 **The layout never changes.** It is cut from `CITY_SEED` in `src/config.js`,
 which is a constant, so the city is built from scratch on every reload and
 comes out the same city every time — the one you learned last night.
@@ -1146,6 +1175,8 @@ PARTY.restart()    // a fresh night
 PARTY.bench()      // ms a frame of city costs
 PARTY.glass(false)       // the old pixel-art hourglass; true for the drawn one
 PARTY.glass({wobble: 2.5})   // ...or turn one dial of its line
+PARTY.backWindows(true)  // put the windows back on the back building's roof
+PARTY.skylights(true)    // put the glass back in the roofs
 PARTY.menu(1, 0.06)      // light a way in and pin its punch, to look at it
 PARTY.intro(8)     // replay the intro, at eight drawings a second
 PARTY.introAt(3.0)       // ...or pin it three seconds in
