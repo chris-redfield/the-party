@@ -17,7 +17,8 @@
 // city to grey and sets the lit things burning: every colour below comes out
 // of `C`, and the textures tint themselves against whatever is under them.
 // ---------------------------------------------------------------------------
-import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R } from './config.js';
+import { WALK, TILE, VIEW_W, VIEW_H, COLOR_DOORS, PUMPKIN_R, INK } from './config.js';
+import { inkBox, inkLine, INK_COLOR } from './ink.js';
 import { makeRng } from './rng.js';
 import { C, MIX, lerpHex } from './palette.js';
 
@@ -146,7 +147,11 @@ function tex(ctx, t, x, y, w, h, o, alpha) {
   const k = o.z / t.scale;
   t.pat.setTransform(new DOMMatrix([k, 0, 0, k, o.ox, o.oy]));
   ctx.save();
-  ctx.globalAlpha = alpha;
+  // The drawings are flat colour.  With the ink on, the surface noise is
+  // turned most of the way down rather than off: a wall at exactly zero grit
+  // is a dead rectangle, and the sprites are not that flat either - they have
+  // a little life in the fill.  `INK.grit` is the one dial for all of it.
+  ctx.globalAlpha = INK.on ? alpha * INK.grit : alpha;
   ctx.fillStyle = t.pat;
   ctx.fillRect(x, y, w, h);
   ctx.restore();
@@ -173,32 +178,50 @@ function drop(ctx, x, y, w, h, dx, dy) {
 const CACHE = new Map();
 let cacheKey = '';
 
-function part(key, w, h, paintIt) {
-  const k = `${MIX.scene}`;
+function part(key, w, h, paintIt, unit) {
+  // the ink dials are in the key too: turning one at the console has to throw
+  // away the windows that were stamped with the old line
+  const k = `${MIX.scene}|${INK.on}|${INK.weight}|${INK.wobble}|${INK.over}`;
   if (cacheKey !== k) { CACHE.clear(); cacheKey = k; }
   let cv = CACHE.get(key);
   if (cv) return cv;
   cv = blank(w, h);
-  paintIt(cv.getContext('2d'), w / 30, h / 26);
+  paintIt(cv.getContext('2d'), unit === undefined ? w / 30 : unit, h / 26);
   CACHE.set(key, cv);
   return cv;
 }
 
+// A drawn line wanders off its rectangle and its corners run past each other,
+// so the stamped window needs room round it that the crisp one never did.
+// Without this the wobble is silently sliced off at the edge of the canvas,
+// which flattens exactly the side of the line you were trying to see.
+const WIN_PAD = 5;
+
 /** One window: the reveal, the glass, the bars, the frame and the sill. */
-function windowPart(variant, z) {
-  const w = Math.max(6, Math.round(30 * z)), h = Math.max(6, Math.round(26 * z));
-  return part(`win${variant}|${z}`, w, h, (g, u) => {
+function windowPart(variant, z, ink) {
+  const pad = ink ? WIN_PAD : 0;
+  const w = Math.max(6, Math.round((30 + pad * 2) * z));
+  const h = Math.max(6, Math.round((26 + pad * 2) * z));
+  return part(`win${variant}|${z}|${ink}`, w, h, (g, u) => {
+    g.translate(pad * u, pad * u);
     const lit = variant > 0;
     const R = (x, y, ww, hh, col) => {
       g.fillStyle = col;
       g.fillRect(Math.round(x * u), Math.round(y * u),
                  Math.max(1, Math.round(ww * u)), Math.max(1, Math.round(hh * u)));
     };
-    R(0, 0, 30, 24, C.dark);                       // the hole in the wall
+    // With the ink on, the drawn frame IS the frame: the dark reveal and the
+    // four grey bars underneath it go away and the glass runs right out to
+    // the line.  Stacking ink on top of them was the first thing tried and it
+    // reads as a thicker computer frame - you cannot see a line wander when
+    // the thing behind it is already the same black.  An ink outline needs
+    // flat colour on BOTH sides of it or it is just an edge.
+    if (!ink) R(0, 0, 30, 24, C.dark);             // the hole in the wall
     const glass = !lit ? C.unlit
       : variant === 1 ? C.litWindow
       : variant === 2 ? C.litWindowPale : C.litWindowDeep;
-    R(3, 3, 24, 18, glass);
+    if (ink) R(1, 1, 28, 22, glass);
+    else R(3, 3, 24, 18, glass);
     if (lit) {
       // whatever is going on in there, in silhouette
       if (variant === 1) for (let i = 0; i < 3; i++) R(3, 4 + i * 3, 24, 1.5, C.litWindowDeep);
@@ -208,18 +231,36 @@ function windowPart(variant, z) {
       R(3, 3, 12, 9, C.glassRefl);                 // the street, in the glass
       R(15, 3, 6, 4, C.glassRefl);
     }
-    R(14, 3, 2, 18, C.frame);                      // glazing bars
-    R(3, 11, 24, 2, C.frame);
-    R(1, 1, 28, 2, C.frame);                       // the frame
-    R(1, 1, 2, 22, C.frame);
-    R(27, 1, 2, 22, C.frame);
-    R(1, 21, 28, 2, C.frame);
-    R(1, 1, 28, 1, C.frameLit);
-    R(1, 1, 1, 22, C.frameLit);
-    R(0, 21, 30, 3, C.sill);                       // the sill and its shadow
-    R(0, 21, 30, 1, C.frameLit);
-    R(0, 24, 30, 2, C.coreShadow);
-  });
+    if (!ink) {
+      R(14, 3, 2, 18, C.frame);                    // glazing bars
+      R(3, 11, 24, 2, C.frame);
+      R(1, 1, 28, 2, C.frame);                     // the frame
+      R(1, 1, 2, 22, C.frame);
+      R(27, 1, 2, 22, C.frame);
+      R(1, 21, 28, 2, C.frame);
+      R(1, 1, 28, 1, C.frameLit);
+      R(1, 1, 1, 22, C.frameLit);
+      R(0, 21, 30, 3, C.sill);                     // the sill and its shadow
+      R(0, 21, 30, 1, C.frameLit);
+      R(0, 24, 30, 2, C.coreShadow);
+    } else {
+      R(0, 23, 30, 3, C.sill);                     // the sill still sticks out
+    }
+    // The window is the one part of a building that is stamped from a cache
+    // rather than drawn in place, so its wobble is rolled off the VARIANT and
+    // not off the plot: every lit-with-bars window in the city is the same
+    // drawing.  That is how a comic does it too - you draw a window once and
+    // you draw it again.  Four variants is enough that a wall does not read
+    // as a repeat, and it keeps forty windows a frame down to four paths.
+    if (ink) {
+      const W = INK.weight * u, WB = INK.wobble * u, OV = INK.over * u;
+      const sd = 9001 + variant * 137;
+      inkBox(g, 1.5 * u, 1.5 * u, 27 * u, 21 * u, W, sd, WB, OV, '', u);
+      inkLine(g, 15 * u, 2 * u, 15 * u, 22 * u, W * 0.7, sd, 8, WB, OV * 0.7, u);
+      inkLine(g, 2 * u, 12 * u, 28 * u, 12 * u, W * 0.7, sd, 9, WB, OV * 0.7, u);
+      inkLine(g, 0, 23 * u, 30 * u, 23 * u, W * 0.9, sd, 10, WB, OV, u);
+    }
+  }, z);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,37 +865,56 @@ function drawDoor(ctx, door, o) {
   const dw = 36 * z, dh = Math.min(54, wallH - 12) * z;
   const dx = px - dw / 2, dy = py - dh;
 
-  // the reveal: the wall is thick, and the door sits back inside it
-  ctx.fillStyle = C.doorReveal;
-  ctx.fillRect(dx - 6 * z, dy - 8 * z, dw + 12 * z, dh + 8 * z);
+  const ID = INK.on;
+
+  // the reveal: the wall is thick, and the door sits back inside it.  Drawn,
+  // there is no thickness to show - the line is the edge of the hole
+  if (!ID) {
+    ctx.fillStyle = C.doorReveal;
+    ctx.fillRect(dx - 6 * z, dy - 8 * z, dw + 12 * z, dh + 8 * z);
+  }
 
   // the step, with a nosing and the dark under it
   const SD = 20 * z, SW = 56 * z;
-  drop(ctx, px - SW / 2, py, SW, SD, 3 * z, 3 * z);
+  if (!ID) drop(ctx, px - SW / 2, py, SW, SD, 3 * z, 3 * z);
   ctx.fillStyle = C.stoop;
   ctx.fillRect(px - SW / 2, py, SW, SD);
-  ctx.fillStyle = C.curb;
-  ctx.fillRect(px - SW / 2, py, SW, 2 * z);
-  ctx.fillStyle = C.coreShadow;
-  ctx.fillRect(px - SW / 2, py + SD - 3 * z, SW, 3 * z);
+  if (!ID) {
+    ctx.fillStyle = C.curb;                      // the lit nosing
+    ctx.fillRect(px - SW / 2, py, SW, 2 * z);
+    ctx.fillStyle = C.coreShadow;
+    ctx.fillRect(px - SW / 2, py + SD - 3 * z, SW, 3 * z);
+  }
 
   // the frame
   ctx.fillStyle = C.doorFrame;
   ctx.fillRect(dx - 4 * z, dy - 5 * z, dw + 8 * z, dh + 5 * z);
-  ctx.fillStyle = C.frame;
-  ctx.fillRect(dx - 4 * z, dy - 5 * z, dw + 8 * z, 1.5 * z);
+  if (!ID) {
+    ctx.fillStyle = C.frame;
+    ctx.fillRect(dx - 4 * z, dy - 5 * z, dw + 8 * z, 1.5 * z);
+  }
 
   // the door itself: painted wood with two sunk panels
   ctx.fillStyle = col.hex;
   ctx.fillRect(dx, dy, dw, dh);
-  for (const [pyy, phh] of [[0.10, 0.34], [0.52, 0.38]]) {
+  for (const [i, [pyy, phh]] of [[0.10, 0.34], [0.52, 0.38]].entries()) {
     const ax = dx + 5 * z, ay = dy + dh * pyy, aw = dw - 10 * z, ah = dh * phh;
-    ctx.fillStyle = C.doorFrame;
-    ctx.fillRect(ax, ay, aw, ah);
-    ctx.fillStyle = col.trim;
-    ctx.fillRect(ax + 1.5 * z, ay + 1.5 * z, aw - 3 * z, ah - 3 * z);
-    ctx.fillStyle = col.hex;
-    ctx.fillRect(ax + 3 * z, ay + 3 * z, aw - 6 * z, ah - 6 * z);
+    if (ID) {
+      // a sunk panel is a rectangle drawn on a door.  Three nested rectangles
+      // is how you fake one being sunk, and sunk is a lighting word.
+      ctx.fillStyle = col.trim;
+      ctx.fillRect(ax, ay, aw, ah);
+      inkBox(ctx, ax, ay, aw, ah, INK.weight * z * 0.55,
+             (door.plot ? door.plot.seed : 7) + 40 + i, INK.wobble * z * 0.6,
+             INK.over * z * 0.5, '', z);
+    } else {
+      ctx.fillStyle = C.doorFrame;
+      ctx.fillRect(ax, ay, aw, ah);
+      ctx.fillStyle = col.trim;
+      ctx.fillRect(ax + 1.5 * z, ay + 1.5 * z, aw - 3 * z, ah - 3 * z);
+      ctx.fillStyle = col.hex;
+      ctx.fillRect(ax + 3 * z, ay + 3 * z, aw - 6 * z, ah - 6 * z);
+    }
   }
   // the handle
   ctx.fillStyle = C.doorHandle;
@@ -876,8 +936,26 @@ function drawDoor(ctx, door, o) {
   // a lintel over the opening
   ctx.fillStyle = C.ledge;
   ctx.fillRect(dx - 8 * z, dy - 9 * z, dw + 16 * z, 4 * z);
-  ctx.fillStyle = C.coreShadow;
-  ctx.fillRect(dx - 8 * z, dy - 5 * z, dw + 16 * z, 1.5 * z);
+  if (!ID) {
+    ctx.fillStyle = C.coreShadow;
+    ctx.fillRect(dx - 8 * z, dy - 5 * z, dw + 16 * z, 1.5 * z);
+  } else {
+    inkBox(ctx, dx - 8 * z, dy - 9 * z, dw + 16 * z, 4 * z, INK.weight * z * 0.7,
+           (door.plot ? door.plot.seed : 7) + 55, INK.wobble * z * 0.7, INK.over * z * 0.6, '', z);
+  }
+
+  // The door is the one thing on a facade the player is looking FOR, so it
+  // carries the heaviest line on the building - the same way the art gives
+  // the nosferatu's cloak a fatter edge than his fingers.  Seeded off the
+  // door's own block and side, so two doors on one wall are not twins.
+  if (ID) {
+    const W = INK.weight * z, WB = INK.wobble * z, OV = INK.over * z;
+    const sd = (door.plot ? door.plot.seed : 7) ^ 0x5bd1;
+    inkBox(ctx, dx - 4 * z, dy - 5 * z, dw + 8 * z, dh + 5 * z, W * 1.25, sd, WB, OV, '', z);
+    inkBox(ctx, dx, dy, dw, dh, W * 0.7, sd + 1, WB * 0.6, OV * 0.6, '', z);
+    // the step, which is what tells you the door is a door you walk up to
+    inkBox(ctx, px - SW / 2, py, SW, SD, W * 0.85, sd + 2, WB * 0.8, OV * 0.8, 'b', z);
+  }
 
   if (door.tried) {
     ctx.strokeStyle = C.triedMark;   // has to read against the red
@@ -946,6 +1024,30 @@ function drawPlot(ctx, plot, block, o, t) {
   const roofLight = lerpHex(plot.roofLight, plot.roofLightM, MIX.scene);
   ctx.imageSmoothingEnabled = false;
 
+  // THE DRAWN CITY, IN ONE PLACE
+  // ---------------------------
+  // With the ink on this building is built the way the sprites are: flat
+  // masses with a line round them, and nothing else.  That means throwing
+  // away the two tricks the old city leaned on, because both of them are
+  // arguments AGAINST a drawn line rather than versions of it:
+  //
+  //   - the SECOND FACE.  Every ledge here used to be a pair of rectangles,
+  //     a light one over a dark one, to fake a lip catching light.  Next to
+  //     an ink outline that reads as a smudge under the line.  One flat band
+  //     and one drawn edge says the same thing and says it in the same voice.
+  //   - the DROP SHADOW.  Nothing in the art casts one.  `D` below is the
+  //     old `drop` with the ink taken into account, so every shadow in this
+  //     function turns off together and none of them had to be hunted down.
+  const ID = INK.on;
+  const IW = INK.weight * z, IB = INK.wobble * z, IO = INK.over * z;
+  const sd = plot.seed;
+  const D = (cx, cy, cw2, ch2, dx, dy) => { if (!ID) drop(ctx, cx, cy, cw2, ch2, dx, dy); };
+  // one outlined box on the roof, in the line this city is drawn with
+  let inkN = 20;
+  const box = (bx, by, bw, bh, mul = 0.75) => {
+    if (ID) inkBox(ctx, bx, by, bw, bh, IW * mul, sd + (inkN += 3), IB * 0.7, IO * 0.6, '', z);
+  };
+
   // --- roof ---------------------------------------------------------------
   const deck = y0 + (ch - wallH);                // where the roof stops
   ctx.fillStyle = roof;
@@ -973,14 +1075,21 @@ function drawPlot(ctx, plot, block, o, t) {
     const sx2 = x0 + 26 + i * 110, sy2 = y0 + 30 + rr(0, 26);
     if (sx2 + 40 > x1 - 10 || sy2 + 28 > deck - 6) break;
     const lit = rng.chance(0.45);
-    drop(ctx, X(sx2 - 2), Y(sy2 - 2), 40 * z, 28 * z, 3 * z, 4 * z);
-    ctx.fillStyle = C.skylightFrame;
-    ctx.fillRect(X(sx2 - 2), Y(sy2 - 2), 40 * z, 28 * z);
+    D(X(sx2 - 2), Y(sy2 - 2), 40 * z, 28 * z, 3 * z, 4 * z);
+    if (!ID) {
+      ctx.fillStyle = C.skylightFrame;
+      ctx.fillRect(X(sx2 - 2), Y(sy2 - 2), 40 * z, 28 * z);
+    }
     ctx.fillStyle = lit ? C.litSkylight : C.dark;
     ctx.fillRect(X(sx2), Y(sy2), 36 * z, 24 * z);
-    if (!lit) { ctx.fillStyle = C.glassRefl; ctx.fillRect(X(sx2), Y(sy2), 16 * z, 10 * z); }
-    ctx.fillStyle = C.skylightFrame;
-    ctx.fillRect(X(sx2 + 17), Y(sy2), 2 * z, 24 * z);
+    if (!lit && !ID) { ctx.fillStyle = C.glassRefl; ctx.fillRect(X(sx2), Y(sy2), 16 * z, 10 * z); }
+    if (!ID) {
+      ctx.fillStyle = C.skylightFrame;
+      ctx.fillRect(X(sx2 + 17), Y(sy2), 2 * z, 24 * z);
+    } else {
+      box(X(sx2), Y(sy2), 36 * z, 24 * z);
+      inkLine(ctx, X(sx2 + 18), Y(sy2), X(sx2 + 18), Y(sy2 + 24), IW * 0.5, sd + 61, 14, IB * 0.5, 0, z);
+    }
   }
   // air handling units
   for (let i = 0; i < 2; i++) {
@@ -988,44 +1097,74 @@ function drawPlot(ctx, plot, block, o, t) {
     const ax2 = rr(x0 + 20, x1 - 20 - aw);
     const ay2 = rr(y0 + 66, deck - 12 - ah);
     if (ay2 + ah > deck - 6) continue;
-    drop(ctx, X(ax2), Y(ay2), aw * z, ah * z, 4 * z, 5 * z);
+    D(X(ax2), Y(ay2), aw * z, ah * z, 4 * z, 5 * z);
     ctx.fillStyle = C.roofVent;
     ctx.fillRect(X(ax2), Y(ay2), aw * z, ah * z);
-    ctx.fillStyle = C.roofVentTop;
-    ctx.fillRect(X(ax2), Y(ay2), aw * z, 4 * z);
+    if (!ID) {                                    // the lit top face
+      ctx.fillStyle = C.roofVentTop;
+      ctx.fillRect(X(ax2), Y(ay2), aw * z, 4 * z);
+    }
     ctx.fillStyle = C.roofVentSlat;
     for (let v = 0; v < 3; v++) ctx.fillRect(X(ax2 + 4), Y(ay2 + 8 + v * 5), (aw - 8) * z, 2 * z);
+    box(X(ax2), Y(ay2), aw * z, ah * z);
   }
   // water tank on stilts
   if (deck - y0 > 70) {
     const tx = rr(x0 + 30, x1 - 70), ty = y0 + 24;
-    drop(ctx, X(tx), Y(ty), 44 * z, 46 * z, 5 * z, 7 * z);
+    D(X(tx), Y(ty), 44 * z, 46 * z, 5 * z, 7 * z);
     ctx.fillStyle = C.tankLeg;
     for (let l = 0; l < 4; l++) ctx.fillRect(X(tx + 4 + l * 11), Y(ty + 30), 3 * z, 14 * z);
-    // three flat bands make a barrel without a gradient in sight
-    ctx.fillStyle = C.tankDark;
-    ctx.fillRect(X(tx), Y(ty), 44 * z, 32 * z);
-    ctx.fillStyle = C.tankBody;
-    ctx.fillRect(X(tx + 5), Y(ty), 30 * z, 32 * z);
-    ctx.fillStyle = C.tankTop;
-    ctx.fillRect(X(tx + 22), Y(ty), 9 * z, 32 * z);
-    ctx.fillStyle = C.tankTop;
-    ctx.beginPath();
-    ctx.ellipse(X(tx + 22), Y(ty + 2), 22 * z, 5 * z, 0, 0, 6.2832);
-    ctx.fill();
-    ctx.fillStyle = C.tankBand;
-    for (let b = 0; b < 3; b++) ctx.fillRect(X(tx), Y(ty + 10 + b * 8), 44 * z, 1.6 * z);
+    if (ID) {
+      // The tank was three vertical bands faking a cylinder lit from the
+      // side.  A drawn barrel is one flat colour with hoops ON it - the round
+      // is carried by the hoops bending, not by the paint getting lighter.
+      ctx.fillStyle = C.tankBody;
+      ctx.fillRect(X(tx), Y(ty), 44 * z, 32 * z);
+      ctx.fillStyle = C.tankTop;
+      ctx.beginPath();
+      ctx.ellipse(X(tx + 22), Y(ty + 2), 22 * z, 5 * z, 0, 0, 6.2832);
+      ctx.fill();
+      for (let l = 0; l < 4; l++)
+        inkLine(ctx, X(tx + 5.5 + l * 11), Y(ty + 30), X(tx + 5.5 + l * 11), Y(ty + 44),
+                IW * 0.5, sd + 70 + l, 15 + l, IB * 0.5, 0, z);
+      inkBox(ctx, X(tx), Y(ty), 44 * z, 32 * z, IW * 0.8, sd + 74, IB * 0.7, IO * 0.6, 't', z);
+      for (let b = 0; b < 3; b++)
+        inkLine(ctx, X(tx), Y(ty + 10 + b * 8), X(tx + 44), Y(ty + 10 + b * 8),
+                IW * 0.45, sd + 80 + b, 19 + b, IB * 0.6, 0, z);
+      ctx.strokeStyle = INK_COLOR;
+      ctx.lineWidth = IW * 0.8;
+      ctx.beginPath();
+      ctx.ellipse(X(tx + 22), Y(ty + 2), 22 * z, 5 * z, 0, 0, 6.2832);
+      ctx.stroke();
+    } else {
+      // three flat bands make a barrel without a gradient in sight
+      ctx.fillStyle = C.tankDark;
+      ctx.fillRect(X(tx), Y(ty), 44 * z, 32 * z);
+      ctx.fillStyle = C.tankBody;
+      ctx.fillRect(X(tx + 5), Y(ty), 30 * z, 32 * z);
+      ctx.fillStyle = C.tankTop;
+      ctx.fillRect(X(tx + 22), Y(ty), 9 * z, 32 * z);
+      ctx.fillStyle = C.tankTop;
+      ctx.beginPath();
+      ctx.ellipse(X(tx + 22), Y(ty + 2), 22 * z, 5 * z, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = C.tankBand;
+      for (let b = 0; b < 3; b++) ctx.fillRect(X(tx), Y(ty + 10 + b * 8), 44 * z, 1.6 * z);
+    }
   }
   // roof hatch and a vent pipe
   {
     const hx = x1 - 54, hy = deck - 34;
-    drop(ctx, X(hx), Y(hy), 24 * z, 18 * z, 3 * z, 4 * z);
+    D(X(hx), Y(hy), 24 * z, 18 * z, 3 * z, 4 * z);
     ctx.fillStyle = C.hatchBody;
     ctx.fillRect(X(hx), Y(hy), 24 * z, 18 * z);
     ctx.fillStyle = C.hatchLid;
     ctx.fillRect(X(hx), Y(hy), 24 * z, 5 * z);
+    box(X(hx), Y(hy), 24 * z, 18 * z);
+    if (ID) inkLine(ctx, X(hx), Y(hy + 5), X(hx + 24), Y(hy + 5), IW * 0.5, sd + 88, 23, IB * 0.5, 0, z);
     ctx.fillStyle = C.pipe;
     ctx.fillRect(X(x0 + 20), Y(deck - 26), 5 * z, 16 * z);
+    box(X(x0 + 20), Y(deck - 26), 5 * z, 16 * z, 0.5);
   }
 
   // the parapet running round the roof: this is what gives the block height
@@ -1034,10 +1173,17 @@ function drawPlot(ctx, plot, block, o, t) {
   ctx.fillRect(X(x0), Y(y0), w, P * z);
   ctx.fillRect(X(x0), Y(y0), P * z, rh);
   ctx.fillRect(X(x1 - P), Y(y0), P * z, rh);
-  ctx.fillStyle = C.wallTopDark;
-  ctx.fillRect(X(x0), Y(y0 + P), w, 4 * z);
-  ctx.fillRect(X(x0 + P), Y(y0 + P), 4 * z, rh - P * z);
-  ctx.fillRect(X(x1 - P - 4), Y(y0 + P), 4 * z, rh - P * z);
+  if (!ID) {                                     // the dark inner face of it
+    ctx.fillStyle = C.wallTopDark;
+    ctx.fillRect(X(x0), Y(y0 + P), w, 4 * z);
+    ctx.fillRect(X(x0 + P), Y(y0 + P), 4 * z, rh - P * z);
+    ctx.fillRect(X(x1 - P - 4), Y(y0 + P), 4 * z, rh - P * z);
+  } else {
+    // the same three faces, said with three lines
+    inkLine(ctx, X(x0), Y(y0 + P), X(x1), Y(y0 + P), IW * 0.6, sd + 11, 24, IB * 0.8, IO * 0.5, z);
+    inkLine(ctx, X(x0 + P), Y(y0 + P), X(x0 + P), Y(y0 + rh / z), IW * 0.6, sd + 12, 25, IB * 0.8, 0, z);
+    inkLine(ctx, X(x1 - P), Y(y0 + P), X(x1 - P), Y(y0 + rh / z), IW * 0.6, sd + 13, 26, IB * 0.8, 0, z);
+  }
 
   // upper storeys on the north face, so the block has a back as well as a
   // front - but only on the building at the back, since anything in front of
@@ -1046,19 +1192,24 @@ function drawPlot(ctx, plot, block, o, t) {
     const wx = x0 + 16 + c * 40;
     if (wx + 22 > x1 - 10) break;
     const lit = rng.chance(0.4);
-    ctx.fillStyle = C.doorReveal;
-    ctx.fillRect(X(wx - 1), Y(y0 + 13), 24 * z, 16 * z);
+    if (!ID) {
+      ctx.fillStyle = C.doorReveal;
+      ctx.fillRect(X(wx - 1), Y(y0 + 13), 24 * z, 16 * z);
+    }
     ctx.fillStyle = lit ? C.litSkylight : C.unlit;
     ctx.fillRect(X(wx), Y(y0 + 14), 22 * z, 14 * z);
-    if (!lit) { ctx.fillStyle = C.glassRefl; ctx.fillRect(X(wx), Y(y0 + 14), 10 * z, 6 * z); }
+    if (!lit && !ID) { ctx.fillStyle = C.glassRefl; ctx.fillRect(X(wx), Y(y0 + 14), 10 * z, 6 * z); }
+    box(X(wx), Y(y0 + 14), 22 * z, 14 * z, 0.6);
   }
 
   // --- the front wall -----------------------------------------------------
   const fy = y1 - wallH;
   ctx.fillStyle = C.wallTop;                    // parapet over the facade
   ctx.fillRect(X(x0), Y(fy - 10), w, 10 * z);
-  ctx.fillStyle = C.wallTopDark;
-  ctx.fillRect(X(x0), Y(fy - 3), w, 3 * z);
+  if (!ID) {                                    // its shadowed underside
+    ctx.fillStyle = C.wallTopDark;
+    ctx.fillRect(X(x0), Y(fy - 3), w, 3 * z);
+  }
 
   ctx.fillStyle = base;
   ctx.fillRect(X(x0), Y(fy), w, wallH * z);
@@ -1066,17 +1217,23 @@ function drawPlot(ctx, plot, block, o, t) {
   tex(ctx, material, X(x0), Y(fy), w, wallH * z, o, 0.95);
   tex(ctx, TEX.wear, X(x0), Y(fy), w, wallH * z, o, 0.55);
 
-  // a string course between the storeys
-  ctx.fillStyle = C.ledge;
-  ctx.fillRect(X(x0), Y(fy + 40), w, 3 * z);
-  ctx.fillStyle = C.coreShadow;
-  ctx.fillRect(X(x0), Y(fy + 43), w, 2 * z);
+  // a string course between the storeys.  Drawn, it is one line and not a
+  // lit edge over a dark one - the ink pass below puts it in.
+  if (!ID) {
+    ctx.fillStyle = C.ledge;
+    ctx.fillRect(X(x0), Y(fy + 40), w, 3 * z);
+    ctx.fillStyle = C.coreShadow;
+    ctx.fillRect(X(x0), Y(fy + 43), w, 2 * z);
+  }
 
-  // the plinth the whole thing stands on
+  // the plinth the whole thing stands on: the flat band stays, the hard
+  // shadow along its foot goes and the line does that job
   ctx.fillStyle = baseDark;
   ctx.fillRect(X(x0), Y(y1 - 12), w, 12 * z);
-  ctx.fillStyle = C.coreShadow;
-  ctx.fillRect(X(x0), Y(y1 - 3), w, 3 * z);
+  if (!ID) {
+    ctx.fillStyle = C.coreShadow;
+    ctx.fillRect(X(x0), Y(y1 - 3), w, 3 * z);
+  }
 
   // --- windows ------------------------------------------------------------
   // as many as go across this particular frontage, centred on it, and none
@@ -1084,6 +1241,31 @@ function drawPlot(ctx, plot, block, o, t) {
   // A shallow plot gets a short building, and a short building has room for
   // one row of windows rather than two: a row needs 32 more of the facade,
   // and anything that does not fit ends up hanging below the plinth.
+  // --- and now the line ---------------------------------------------------
+  // Laid ON TOP of the fills rather than between them, exactly like the
+  // outline on a sprite - the windows and the door come after and carry their
+  // own line, so the wall's ink runs behind them the way it would on paper.
+  // Every wobble is seeded from `plot.seed`, so this building is drawn the
+  // same way for the whole night and from wherever you stand.
+  //
+  // Only the lines a person would actually draw are here.  Outlining every
+  // rectangle in the roof furniture turns a building into a wireframe - the
+  // hand draws the silhouette, the roofline, the floor line and the holes,
+  // and lets the flat colour do the rest.
+  if (ID) {
+    // the whole mass: roof edge down both flanks to the pavement.  No line
+    // along the foot - the building meets the ground, there is no edge there
+    inkBox(ctx, X(x0), Y(y0), w, (y1 - y0) * z, IW, sd, IB, IO, 'b', z);
+    // the roofline, which is the one that makes it read as a building: the
+    // parapet the facade stops at, drawn heavier than the rest
+    inkLine(ctx, X(x0), Y(fy - 10), X(x1), Y(fy - 10), IW * 1.15, sd, 4, IB, IO, z);
+    // where the front wall starts, behind the parapet cap
+    inkLine(ctx, X(x0), Y(fy), X(x1), Y(fy), IW * 0.8, sd, 5, IB * 0.7, IO * 0.5, z);
+    // the string course between the storeys, and the plinth at the bottom
+    inkLine(ctx, X(x0), Y(fy + 41), X(x1), Y(fy + 41), IW * 0.7, sd, 6, IB * 0.8, IO * 0.6, z);
+    inkLine(ctx, X(x0), Y(y1 - 12), X(x1), Y(y1 - 12), IW * 0.9, sd, 7, IB * 0.8, IO * 0.7, z);
+  }
+
   const PITCH = 46, WINW = 30;
   const cols = Math.max(1, Math.floor((cw - 8 - WINW) / PITCH) + 1);
   const rows = Math.max(1, Math.min(2, Math.floor((wallH - 52) / 32) + 1));
@@ -1099,8 +1281,9 @@ function drawPlot(ctx, plot, block, o, t) {
       // out every window on the wall and leaves a house that is all door.
       if (r === rows - 1 && wx + WINW > doorX - 28 && wx < doorX + 28) continue;
       const variant = rng.chance(0.55) ? rng.int(1, 3) : 0;
-      const cv = windowPart(variant, z);
-      ctx.drawImage(cv, Math.round(X(wx - 2)), Math.round(Y(wy - 2)));
+      const cv = windowPart(variant, z, INK.on);
+      const pad = INK.on ? WIN_PAD : 0;
+      ctx.drawImage(cv, Math.round(X(wx - 2 - pad)), Math.round(Y(wy - 2 - pad)));
     }
   }
 

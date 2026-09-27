@@ -260,3 +260,26 @@ export const MUSIC_DUCK = 0.55;        // how far it drops when you are on top o
 
 // --- party proximity --------------------------------------------------------
 export const BASS_RADIUS = 900;            // you start to feel the bass
+
+// --- the ink the city is drawn in -------------------------------------------
+// The buildings used to be crisp axis-aligned rectangles with a noise texture
+// over them, which put the city in a different medium from the people
+// standing on it.  These are the dials on the drawn line that replaced it -
+// see src/ink.js for what each one is actually doing to the stroke.
+//
+// It is a live object rather than four consts because the whole point is to
+// be able to sit in the game and turn it: `PARTY.ink({weight: 3})` at the
+// console, or `PARTY.ink(false)` to put the old crisp city back for a
+// side-by-side.  Nothing here is on a timer and nothing here is random per
+// frame - see the note at the top of ink.js.
+export const INK = {
+  on: true,
+  weight: 2.3,      // screen px at z=1.  The art's line is heavy; so is this.
+  wobble: 1.5,      // how far the stroke wanders off true, screen px at z=1
+  over: 3.0,        // how far a corner runs past its neighbour
+  // How much of the old surface noise survives underneath.  The drawings are
+  // flat colour, so the city has to be nearly flat too or the line is the
+  // only thing that matches and the fill still gives it away.  0 is fully
+  // flat, 1 is the old gritty wall.
+  grit: 0.22,
+};

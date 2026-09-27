@@ -1,4 +1,5 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK } from './config.js';
+import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
 import { newGame, updateGame, knock, bringTipForward, giveTip } from './game.js';
@@ -133,6 +134,21 @@ function frame(now) {
 window.PARTY = {
   get game() { return game; },
   get cam() { return cam; },
+  /**
+   * A/B for the drawn line on the buildings.  `PARTY.ink(false)` puts the old
+   * crisp textured city straight back; `PARTY.ink(true)` returns.  Pass an
+   * object to turn one dial without a reload - `PARTY.ink({weight: 3.2})`,
+   * `PARTY.ink({wobble: 0})` for a heavy but true line, `PARTY.ink({grit: 1})`
+   * to put the old surface noise back under the ink.
+   */
+  ink(v) {
+    if (typeof v === 'boolean') INK.on = v;
+    else if (v && typeof v === 'object') Object.assign(INK, v);
+    resetInk();          // the wobbles are cached per edge; the dials moved
+    return { ...INK };
+  },
+  /** distinct drawn-edge shapes rolled so far - see inkShapeCount in ink.js */
+  inkShapes: inkShapeCount,
   /** A/B for the rounding rule the people are drawn on - evaluation only. */
   worldLattice(on) { setWorldLattice(on); return on ? 'people on the street lattice' : 'people on the camera lattice (the old rule)'; },
   restart,
