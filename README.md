@@ -1,7 +1,7 @@
 # THE PARTY
 
-A Halloween game. You are an extremely cool vampire — the kind who wears
-sunglasses at night — and you have lost the invitation to the monsters' party.
+A Halloween game. You are an extremely cool vampire, the kind who wears
+sunglasses at night, and you have lost the invitation to the monsters' party.
 You know it is happening. You know it is in this city. You do not know which
 door. It is midnight. At 6:00 AM the sun comes up and turns you into a small
 pile of something the street sweeper will not even notice.
@@ -21,7 +21,39 @@ python3 -m http.server 8080
 # then open http://localhost:8080
 ```
 
-Any static server works. Drop the folder on itch.io / GitHub Pages as-is.
+Any static server works.
+
+## Shipping it
+
+```bash
+./package.sh          # -> dist/ and the-party-itch.zip
+```
+
+Upload the zip to itch.io, project kind **HTML**, embed **1280x720**,
+fullscreen **on**, mobile **off**, autostart **off**. About 8.6 MB, 41 files.
+
+The repo is not the build: `assets/` holds 42 MB, most of which is the source
+footage the ending was cut out of. What does not ship is written down in the
+`EXCLUDE` list at the top of `package.sh`, one line each with a reason, and
+**every one of them is checked against the source before anything is copied** —
+the moment the game actually asks for something on that list, the build fails
+instead of shipping a game that 404s. Everything else under `assets/` is
+copied wholesale, because the other order of failure is the dangerous one: a
+hand-written copy list fails by omission, and a missing asset is invisible in
+dev, where the game reads the repo and works perfectly.
+
+> That is not a hypothetical. BATIDÃO DE CÔCO's packager carries the same
+> warning about its sibling: the flying dungeon's build script had a `cp` line
+> per asset folder, a folder was added, the line was not, and **every packaged
+> build shipped without its fly sprites** while dev kept working.
+
+Then it serves the build, opens it in a browser and reads the server's own log
+back: **one 404 and it is not a release.** `favicon.ico` is forgiven, because
+that is the browser asking on its own behalf. It also prints what it carried
+that nothing asked for, which is where junk shows up — the music (fetched on
+the first keypress) and the font's licence are the two expected ones.
+
+`dist/` and the zip are not in the repo; the script rebuilds them.
 
 `?label=0` starts past the studio label, which is what any scripted or
 headless run wants — see below. `?seed=` and `?citySeed=` are the other two.
