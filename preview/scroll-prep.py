@@ -41,7 +41,22 @@ DPI = 200
 
 # Where one band stops and the next starts, in luminance.  Read off the
 # histogram of the art itself, not guessed - see the note above.
-BANDS = [205, 160, 96]          # paper | turn | cut edge | down the tube
+BANDS = [205, 160, 96]          # paper | turn | down the tube | deeper in
+# EXTRA THRESHOLDS THAT ARE ASKED FOR LINES BUT NEVER FOR FILL.
+#
+# The cut rim of a rolled tube - the thickness of the paper, seen end on - is
+# a flat band at luminance 208 on this art, and the sheet's own gradient runs
+# 207 to 255.  So the rim cannot be told from the paper by a threshold: put
+# the cut at 215 and half the sheet goes with it.  It CAN be told by its
+# edges, which jump 22 levels against the paper above it and 86 against the
+# dark inside the tube - so this threshold is run for its boundaries only,
+# and the hard test throws away everything it finds except the rim.  Without
+# it the tube's mouth has no line under it and the roll reads as a stain on
+# the sheet rather than as something standing proud of it.
+#
+# The general rule this is an instance of: a boundary that is soft everywhere
+# except in one place still tells you where that one place is.
+EDGE_ONLY = [215]
 MIN_AREA = 900                  # px at DPI, below which a region is a speckle
 EPS = 2.2                       # how hard the outlines are simplified, in px
 # A DRAWN EDGE IS A CLIFF; SHADING IS A SLOPE.
@@ -53,6 +68,22 @@ EPS = 2.2                       # how hard the outlines are simplified, in px
 # shading slopes at well under 3, and every real edge on this art is over 30.
 HARD = 14
 RUN = 6                         # points in a row before a hard run is a line
+# A drawn edge does not stop being one because something soft crosses it.  The
+# roll's near side runs up to meet the torn top of the sheet, and for the last
+# few points of that run the reference's own shading lies over the edge and
+# takes the contrast under HARD - so the run was being cut there and the tail
+# thrown away for being too short, which left the roll not quite joined to the
+# paper behind it.  A soft stretch this short between two hard ones is a
+# smudge on a line, not a gap in it.
+GAP = 10
+# How far a run is allowed to carry on past the point where it fades out.
+# A drawn line runs INTO the thing it meets; it does not stop a few pixels
+# short of it and leave the join open.  The roll's near edge is the case that
+# needs it: it climbs to meet the torn top of the sheet, loses its contrast in
+# the last few pixels under the reference's own shading, and without this the
+# sheet's top edge sails straight over the roll with nothing marking where it
+# passes behind.  This is the same instinct as the overshoot in src/ink.js -
+# a hand going past the corner rather than stopping exactly on it.
 
 
 def rasterise(eps):
@@ -126,16 +157,31 @@ def hard_runs(loop, grad, closed_ok=True):
         x0, x1 = max(0, x - 2), min(w, x + 3)
         hard.append(grad[y0:y1, x0:x1].max() if y1 > y0 and x1 > x0 else 0)
     hard = [v >= HARD for v in hard]
+    # close the smudges before deciding where the line starts and stops
+    n = len(hard)
+    for i in range(n):
+        if hard[i]:
+            continue
+        j = i
+        while j < n and not hard[j]:
+            j += 1
+        if j - i <= GAP and i > 0 and j < n and hard[i - 1] and hard[j]:
+            for k in range(i, j):
+                hard[k] = True
     if all(hard) and closed_ok:
         return [(loop, True)]                      # the whole thing is drawn
-    runs, cur = [], []
-    for p, ok in zip(loop, hard):
+    REACH = 7
+    runs, cur, start = [], [], 0
+    for idx, (p, ok) in enumerate(zip(loop, hard)):
         if ok:
+            if not cur: start = idx
             cur.append(p)
         elif cur:
-            if len(cur) >= RUN: runs.append((cur, False))
+            if len(cur) >= RUN:
+                runs.append((loop[max(0, start - REACH):idx + REACH], False))
             cur = []
-    if len(cur) >= RUN: runs.append((cur, False))
+    if len(cur) >= RUN:
+        runs.append((loop[max(0, start - REACH):], False))
     # a loop that starts and ends hard is one run through the seam
     if len(runs) > 1 and hard[0] and hard[-1]:
         runs[0] = (runs[-1][0] + runs[0][0], False)
@@ -223,6 +269,14 @@ def main(eps_path, out_path):
         layers.append(loops)
         print(f'band {band}: {len(loops)} filled region(s), '
               f'{sum(len(l) for l in loops)} points', file=sys.stderr)
+    for t in EDGE_ONLY:
+        for loop in trace(solid & (lum >= t)):
+            if len(loop) < 40:
+                continue
+            for run, closed in hard_runs(loop, grad):
+                run = simplify(run, EPS)
+                if len(run) >= 3:
+                    edges.append({'closed': closed, 'band': 2, 'pts': norm(run)})
     print(f'{len(edges)} drawn edge(s), '
           f'{sum(len(e["pts"]) for e in edges)} points '
           f'({sum(1 for e in edges if e["closed"])} closed)', file=sys.stderr)

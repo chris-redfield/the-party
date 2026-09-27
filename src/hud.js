@@ -569,20 +569,11 @@ function drawClues(ctx, tips) {
     }
   }
 
-  // Not a score out of four: a count of things you have been told, which says
-  // nothing about how much of it is true.  The denominator is there because
-  // the night only hands over MAX_TIPS of them and you should be able to see
-  // how many asks you have left - that is inventory, not deduction.
-  //
-  // It only appears once there is something to count.  "TOLD 0/5" under an
-  // empty deck is the same instruction the four lines were, in fewer words.
-  if (!deck.length) return;
-  const full = deck.length >= MAX_TIPS;
-  ctx.textAlign = 'left';
-  ctx.font = FONT(12);
-  ctx.fillStyle = full ? '#e8b23a' : '#c9a8ff';
-  ctx.fillText(`YOU HAVE BEEN TOLD  ${deck.length}/${MAX_TIPS}` +
-    (full ? '   NOBODY ELSE WILL TALK' : ''), x0, VIEW_H - 14);
+  // Nothing is written under the deck any more.  It used to carry a count -
+  // YOU HAVE BEEN TOLD 2/5, and NOBODY ELSE WILL TALK once it was full - and
+  // the deck already says both: the cards are the count, and a fifth card
+  // with nothing behind it is the night being done talking to you.  A number
+  // under a picture of the same number is the HUD reading itself out loud.
 }
 
 // ---------------------------------------------------------------------------
@@ -770,8 +761,16 @@ function drawMinimap(ctx, game) {
   const sy = VIEW_H - 26 - 36 - sh;
   drawScroll(ctx, sx, sy, S, sq);
 
-  // the map, centred in the clean part of the sheet
-  const x = sx + (IX + IW / 2) * S * sq - MAP / 2;
+  // The map, centred in the clean part of the sheet and then nudged right.
+  //
+  // `SCROLL.mapShift` is the nudge, in px, positive to the right.  The clean
+  // rectangle stops where the paper starts rolling, so centring the map in it
+  // is centring it on the FLAT part of the sheet - and the roll is paper too,
+  // and the eye counts it.  Measured on the finished frame: the whole paper
+  // runs 1036..1258 and the map's own middle landed at 1133, twelve or so px
+  // left of the object's, which is exactly what it looked like.  One number,
+  // and `PARTY.scroll({mapShift: 20})` moves it while you watch.
+  const x = sx + (IX + IW / 2) * S * sq - MAP / 2 + SCROLL.mapShift;
   const y = sy + (IY + IH / 2) * S - MAP / 2;
   const SC = MAP / WORLD;
   const MX = (wx) => x + wx * SC;

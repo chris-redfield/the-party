@@ -263,17 +263,17 @@ what is hanging beside the door. Each one you are given is a playing card, and
 they stack up bottom left along the axis between you and the screen — newest
 lying face up on top, the ones underneath showing only their corner index, the
 way a deck does when it is not squared up. Until you have been given anything
-the deck is one card, face down, **and that is all it is** — it used to stand
-four lines of instructions beside it (*nothing yet / find a cat / find a
-monster / believe half of it*) with a count of nought out of five underneath,
-which is the corner of the screen explaining the game at the one moment you
-are most likely to be looking at it. The face-down card says the whole of it:
-there is a deck, and there is nothing in it. The count comes back as soon as
-there is something to count, because from then on it is inventory — how many
-asks the night has left — rather than an instruction. Click any card that is
-not already on top and it comes to the front, so you can read whichever one
-you need; and the deck stays up while a monster is talking to you, because
-that is the moment a card lands on it.
+the deck is one card, face down. **Nothing is written beside it or under it.**
+It used to carry four lines of instructions (*nothing yet / find a cat / find
+a monster / believe half of it*) and, in every state, a count — YOU HAVE BEEN
+TOLD 2/5, and NOBODY ELSE WILL TALK once it was full. All of it is gone,
+because the deck already says it: the cards **are** the count, a face-down
+card is a night nobody has told you anything about yet, and a fifth card with
+nothing behind it is the city being done talking to you. A number printed
+under a picture of the same number is the HUD reading itself out loud. Click
+any card that is not already on top and it comes to the front, so you can
+read whichever one you need; and the deck stays up while a monster is talking
+to you, because that is the moment a card lands on it.
 
 No two blocks share a south-west corner, so district + avenue + street lands
 you on exactly one block; the decoration then picks out which of that block's
@@ -659,6 +659,30 @@ vector art and the *drawing* is ours.
    levels per pixel and every real edge is over 30, so the threshold is not
    a close call. The turn into the roll therefore arrives as a change of
    colour with no line on it, which is what a soft edge is.
+
+   **And one threshold is asked for lines but never for fill.** The cut rim of
+   a rolled tube — the thickness of the paper, seen end on — is a flat band at
+   luminance 208 on this art, and the sheet's own gradient runs 207 to 255. So
+   the rim cannot be told from the paper by a threshold at all: put the cut at
+   215 and half the sheet goes with it. It *can* be told by its edges, which
+   jump 22 levels against the paper above it and 86 against the dark inside
+   the tube. So that threshold is run for its boundaries only and the hard
+   test throws away everything it finds except the rim. Without it the tube's
+   mouth has no line under it and the roll reads as a stain on the sheet
+   rather than as something standing proud of it. The general rule: **a
+   boundary that is soft everywhere except in one place still tells you where
+   that one place is.**
+
+   Two things keep that test from cutting real lines up. **A short soft
+   stretch between two hard ones is a smudge on a line, not a gap in it**, so
+   it is bridged. And **a run is allowed to carry on a few points past where
+   it fades**, because a drawn line runs *into* the thing it meets rather
+   than stopping short and leaving the join open — the same instinct as the
+   overshoot in `src/ink.js`. The case that needs both is the roll's near
+   side at the top right: it climbs to meet the torn top of the sheet and
+   loses its contrast in the last few pixels under the reference's own
+   shading, and without them the sheet's top edge sails straight over the
+   roll with nothing marking where it passes behind.
 5. It measures the biggest rectangle of plain sheet on the thing, and writes
    the lot out as plain numbers in `src/scrollart.js` — about 6 kB of
    coordinates, normalised 0–1. **No image ships**, and not one pixel of the
@@ -703,7 +727,14 @@ Two more things about the sheet:
   carried by the drawn edge alone and the sheet stops looking as though it
   curves at all; 1 is the shadow at the strength the reference paints it,
   which reads as a second object lying on the map rather than as one sheet
-  going round. It wants to be faint. `PARTY.scrollTurn(0.2)` turns it live.
+  going round. It wants to be faint. `SCROLL.mapShift` is the other taste
+  call: the clean rectangle stops where the paper starts rolling, so centring
+  the map in it centres the map on the *flat* part of the sheet — and the
+  roll is paper too, and the eye counts it. Measured on the finished frame,
+  the whole paper runs 1036–1260 and the map's middle landed a dozen px left
+  of the object's, which is exactly what it looked like, so it is nudged
+  right. `PARTY.scroll({turn: 0.2, mapShift: 20})` turns both while you
+  watch.
 
 The source art is `assets/ON5YU51.eps`, and only the prep script ever reads
 it — nothing at runtime does.
@@ -1278,7 +1309,8 @@ PARTY.bench()      // ms a frame of city costs
 PARTY.glass(false)       // the old pixel-art hourglass; true for the drawn one
 PARTY.glass({wobble: 2.5})   // ...or turn one dial of its line
 PARTY.backWindows(true)  // put the windows back on the back building's roof
-PARTY.scrollTurn(0.2)    // how much shadow the map's scroll keeps, 0..1
+PARTY.scroll({turn: 0.2}) // how much shadow the map's scroll keeps, 0..1
+PARTY.scroll({mapShift: 20})    // ...and where the city sits on the paper
 PARTY.skylights(true)    // put the glass back in the roofs
 PARTY.menu(1, 0.06)      // light a way in and pin its punch, to look at it
 PARTY.intro(8)     // replay the intro, at eight drawings a second

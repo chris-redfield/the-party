@@ -172,8 +172,9 @@ export const HUD_PANELS = false;
 // airbrushed shadow to keep where the sheet rolls up: 0 leaves flat paper and
 // the drawn edge alone, 1 is the wedge the reference paints, and the whole
 // argument for the number in between is written where it is used, in
-// src/hud.js.  Live: `PARTY.scrollTurn(0.2)`.
-export const SCROLL = { turn: 0.4 };
+// src/hud.js.  `mapShift` slides the city on the paper, in px, positive to
+// the right.  Live: `PARTY.scroll({turn: 0.2, mapShift: 20})`.
+export const SCROLL = { turn: 0.4, mapShift: 14 };
 
 export const BACK_WINDOWS = { on: false };
 

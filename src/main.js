@@ -296,10 +296,12 @@ window.PARTY = {
    * made either way, so no other window in the city changes.
    */
   /**
-   * How much of the stock art's shadow survives where the map rolls up.
-   * 0 is flat paper and the drawn edge alone, 1 is the reference's own wedge.
+   * The map's scroll.  `{turn}` is how much of the stock art's shadow survives
+   * where the paper rolls up - 0 is flat paper and the drawn edge alone, 1 is
+   * the reference's own wedge.  `{mapShift}` slides the city on the sheet, in
+   * px, positive to the right.
    */
-  scrollTurn(v) { if (v !== undefined) SCROLL.turn = v; return SCROLL.turn; },
+  scroll(v) { if (v) Object.assign(SCROLL, v); return { ...SCROLL }; },
   backWindows(on) { BACK_WINDOWS.on = !!on; return BACK_WINDOWS.on; },
   /**
    * A/B for the glass in the roofs.  `PARTY.skylights(true)` puts them back.
