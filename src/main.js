@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE } from './config.js';
 import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
@@ -149,6 +149,12 @@ window.PARTY = {
   },
   /** distinct drawn-edge shapes rolled so far - see inkShapeCount in ink.js */
   inkShapes: inkShapeCount,
+  /**
+   * The drink in the two chalices.  `PARTY.chalice({rest: 3})` for a livelier
+   * surface, `{slosh: 0}` to stop a hit throwing it about, `{rest: 0}` for a
+   * dead flat top - worth seeing once, it is the old bar wearing a glass.
+   */
+  chalice(v) { if (v) Object.assign(CHALICE, v); return { ...CHALICE }; },
   /** A/B for the rounding rule the people are drawn on - evaluation only. */
   worldLattice(on) { setWorldLattice(on); return on ? 'people on the street lattice' : 'people on the camera lattice (the old rule)'; },
   restart,

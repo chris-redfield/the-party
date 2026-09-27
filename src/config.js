@@ -283,3 +283,20 @@ export const INK = {
   // flat, 1 is the old gritty wall.
   grit: 0.22,
 };
+
+// --- what is in the glasses --------------------------------------------------
+// The two vitals are chalices now, and the drink in them moves.  These are the
+// dials on that movement - live, like INK above, so they can be turned at the
+// console while watching it: `PARTY.chalice({rest: 3})`.
+export const CHALICE = {
+  // The idle ripple, in px at the glass's nominal 86px height.  This is the
+  // one that decides whether the drink reads as liquid when nothing is
+  // happening.  Too high and it looks like it is boiling.
+  rest: 1.1,
+  // How far a hit throws the surface, as a multiple of the ripple.  Losing
+  // blood should visibly slap the drink about - that is the whole difference
+  // between a glass and a progress bar that happens to be glass-shaped.
+  slosh: 5.5,
+  // how fast a slosh settles back down, in units per second
+  settle: 1.6,
+};

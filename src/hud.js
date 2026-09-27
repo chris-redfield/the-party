@@ -8,6 +8,9 @@ import { shortFact, cardFact, addressOf, claimedIds, FACT_KEYS } from './hints.j
 // the red the cat's gift pours down the screen, which is the red you dry into
 import { BLOOD_RED } from './render.js';
 import { deathText, setDeathFont, deathFontsSettled } from './deathtype.js';
+// the chalices are drawn in the same line as the city - see src/ink.js
+import { inkEdge, INK_COLOR } from './ink.js';
+import { INK, CHALICE } from './config.js';
 
 const FONT = (px, bold = true) =>
   `${bold ? 'bold ' : ''}${px}px "Courier New", ui-monospace, monospace`;
@@ -27,6 +30,188 @@ function panel(ctx, x, y, w, h, alpha = 0.86) {
   ctx.strokeStyle = 'rgba(160,120,220,0.35)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+}
+
+// ---------------------------------------------------------------------------
+// THE CHALICES
+// ---------------------------------------------------------------------------
+// The two vitals are not bars any more.  They are glasses with something in
+// them, and the something moves - which is the whole point: a bar tells you a
+// number, a half-empty glass tells you how much is LEFT, and it tells you
+// while you are looking somewhere else.
+//
+// Three rules, and the liquid stops reading as liquid without any of them:
+//
+//   1. THE SURFACE IS NEVER FLAT AND NEVER STILL.  Two sine waves at
+//      different wavelengths and drifting apart, so the surface never repeats
+//      a shape you can catch.  One wave is a flag; two is water.
+//   2. IT SLOSHES WHEN IT IS SPENT.  Losing blood throws the surface about
+//      and it settles over the next second or so.  A drink that only ever
+//      goes quietly down reads as a progress bar painted red.
+//   3. IT IS OPAQUE AND IT IS FLAT.  No gradient, no shine, no alpha - the
+//      house rule everywhere else in this game.  The surface reads because it
+//      has the ink line ON it, not because it is lighter at the top.
+//
+// The glass itself is drawn with the city's own line (src/ink.js), so the
+// HUD is in the same hand as the buildings and the children.
+
+// How hard each glass is still rocking, and what it was last full to.  Module
+// state because the HUD is redrawn from scratch every frame and a slosh has
+// to outlive one of those.
+const SLOSH = new Map();
+
+/**
+ * One segment of drawn outline per pair of points - a clunky, hand-cut cup.
+ *
+ * `col` matters more than it looks.  The city's ink is near-black because it
+ * is drawn on lit walls; the HUD panel is near-black itself, so the same ink
+ * on it is invisible and the glass comes out as a floating puddle of blood
+ * with no cup round it.  On a dark ground the drawn line is a LIGHT line -
+ * same wobble, same varying weight, same overshoot, opposite end of the
+ * scale.  It is chalk instead of ink, and it is the same hand.
+ */
+function inkPoly(ctx, pts, weight, seed, wobble, over, col, close = false) {
+  ctx.fillStyle = col;
+  const n = pts.length;
+  const last = close ? n : n - 1;
+  for (let i = 0; i < last; i++) {
+    const a = pts[i], b = pts[(i + 1) % n];
+    inkEdge(ctx, a[0], a[1], b[0], b[1], weight, seed, i, wobble, over, 1);
+  }
+}
+
+/**
+ * The outline of a goblet, as plain points in a w x h box.
+ *
+ * Deliberately a POLYGON and not a set of curves.  Curves would want to be
+ * traced smoothly, and a smooth cup next to the buildings would be the one
+ * object in the game that was not cut by hand.  Eight flats down each side of
+ * the bowl, drawn with a line that wanders, reads rounder than a real arc and
+ * it reads drawn.
+ */
+function chaliceShape(x, y, w, h) {
+  const X = (f) => x + f * w, Y = (f) => y + f * h;
+  // down the left of the bowl, across its foot, and back up the right
+  const bowl = [
+    [X(0.00), Y(0.03)], [X(0.02), Y(0.22)], [X(0.07), Y(0.40)],
+    [X(0.16), Y(0.53)], [X(0.30), Y(0.61)], [X(0.50), Y(0.64)],
+    [X(0.70), Y(0.61)], [X(0.84), Y(0.53)], [X(0.93), Y(0.40)],
+    [X(0.98), Y(0.22)], [X(1.00), Y(0.03)],
+  ];
+  return {
+    bowl,
+    rim: { cx: X(0.5), cy: Y(0.03), rx: w * 0.5, ry: h * 0.05 },
+    stem: [[X(0.42), Y(0.62)], [X(0.42), Y(0.83)],
+           [X(0.58), Y(0.62)], [X(0.58), Y(0.83)]],
+    foot: [[X(0.20), Y(0.98)], [X(0.40), Y(0.84)], [X(0.60), Y(0.84)],
+           [X(0.80), Y(0.98)]],
+    base: [[X(0.20), Y(0.98)], [X(0.80), Y(0.98)]],
+    // where the drink lives: the rim line down to the inside of the bowl
+    top: Y(0.06), bottom: Y(0.62),
+  };
+}
+
+/** The bowl as a closed path, so the drink can be clipped to the inside. */
+function bowlPath(ctx, sh) {
+  ctx.beginPath();
+  ctx.moveTo(sh.bowl[0][0], sh.bowl[0][1]);
+  for (let i = 1; i < sh.bowl.length; i++) ctx.lineTo(sh.bowl[i][0], sh.bowl[i][1]);
+  ctx.closePath();
+}
+
+/**
+ * One glass, filled to `frac`.
+ *
+ * `key` names which glass this is so its slosh is remembered between frames,
+ * and seeds its wobble so the blood glass and the night glass are cut
+ * slightly differently - two identical drawings side by side look printed.
+ */
+function chalice(ctx, x, y, w, h, frac, key, colors, t, label, value) {
+  const sh = chaliceShape(x, y, w, h);
+  const f = Math.max(0, Math.min(1, frac));
+
+  // --- how hard is it rocking -------------------------------------------
+  let st = SLOSH.get(key);
+  if (!st) { st = { last: f, amp: 0, t: t }; SLOSH.set(key, st); }
+  const dt = Math.max(0, Math.min(0.1, t - st.t));
+  st.t = t;
+  // a drop throws it about; a gain rocks it too, but less
+  const d = st.last - f;
+  if (d > 0.0005) st.amp = Math.min(1, st.amp + d * 9);
+  else if (d < -0.0005) st.amp = Math.min(1, st.amp - d * 4);
+  st.last = f;
+  st.amp = Math.max(0, st.amp - dt * CHALICE.settle);
+
+  const depth = sh.bottom - sh.top;
+  const surf = sh.bottom - f * depth;
+  const W = INK.weight * 0.85, WB = INK.wobble * 0.8, OV = INK.over * 0.7;
+  const seed = key === 'blood' ? 0x81ce : 0x2f7a;
+
+  // --- the empty glass ---------------------------------------------------
+  ctx.save();
+  bowlPath(ctx, sh);
+  ctx.clip();
+  ctx.fillStyle = colors.empty;
+  ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+
+  // --- the drink ---------------------------------------------------------
+  if (f > 0.001) {
+    // Two waves, different wavelengths, drifting apart at different speeds:
+    // their sum never comes back round to the same shape, so the surface
+    // never looks like it is looping.  The slosh rides on top of both.
+    const rock = st.amp;
+    const a1 = (CHALICE.rest + rock * CHALICE.rest * CHALICE.slosh) * (h / 86);
+    const a2 = (CHALICE.rest * 0.55 + rock * CHALICE.rest * CHALICE.slosh * 0.45) * (h / 86);
+    const k1 = 7.5 / w, k2 = 13.0 / w;
+    const p1 = t * 1.7 + (key === 'blood' ? 0 : 2.1);
+    const p2 = -t * 2.6 + (key === 'blood' ? 1.3 : 0.4);
+    // a slosh tips the whole surface as well as rippling it
+    const tilt = Math.sin(t * 5.2) * rock * CHALICE.rest * 3.1 * (h / 86);
+    const sy = (px) => {
+      const u = (px - x) / w;
+      return surf + Math.sin(px * k1 + p1) * a1 + Math.sin(px * k2 + p2) * a2
+           + (u - 0.5) * tilt;
+    };
+    ctx.fillStyle = colors.fill;
+    ctx.beginPath();
+    ctx.moveTo(x - 3, sy(x - 3));
+    for (let px = x - 3; px <= x + w + 3; px += 2) ctx.lineTo(px, sy(px));
+    ctx.lineTo(x + w + 3, y + h + 4);
+    ctx.lineTo(x - 3, y + h + 4);
+    ctx.closePath();
+    ctx.fill();
+    // The line on the surface.  This is what makes it a surface rather than
+    // a place where one colour stops - same trick as the buildings, where
+    // the ink is laid on the fill and not left as the edge between two.
+    ctx.fillStyle = INK_COLOR;
+    ctx.beginPath();
+    ctx.moveTo(x - 3, sy(x - 3) - W * 0.6);
+    for (let px = x - 3; px <= x + w + 3; px += 2) ctx.lineTo(px, sy(px) - W * 0.6);
+    for (let px = x + w + 3; px >= x - 3; px -= 2) ctx.lineTo(px, sy(px) + W * 0.6);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // --- the glass, over the drink -----------------------------------------
+  inkPoly(ctx, sh.bowl, W, seed, WB, OV, colors.glass);
+  inkPoly(ctx, [sh.stem[0], sh.stem[1]], W, seed + 1, WB, OV, colors.glass);
+  inkPoly(ctx, [sh.stem[2], sh.stem[3]], W, seed + 2, WB, OV, colors.glass);
+  inkPoly(ctx, sh.foot, W, seed + 3, WB, OV, colors.glass);
+  inkPoly(ctx, sh.base, W * 1.1, seed + 4, WB, OV, colors.glass);
+  // the rim, as an ellipse: the one curve in the drawing, because the mouth
+  // of a cup seen from slightly above is the thing that says "cup"
+  ctx.strokeStyle = colors.glass;
+  ctx.lineWidth = W * 1.15;
+  ctx.beginPath();
+  ctx.ellipse(sh.rim.cx, sh.rim.cy, sh.rim.rx, sh.rim.ry, 0, 0, 6.2832);
+  ctx.stroke();
+
+  // --- what it says ------------------------------------------------------
+  ctx.textAlign = 'center';
+  ctx.font = FONT(13);
+  ctx.fillStyle = colors.value;
+  ctx.fillText(`${label} ${value}`, x + w / 2, y + h + 16);
 }
 
 function bar(ctx, x, y, w, h, frac, fill, back, label) {
@@ -51,17 +236,24 @@ export function drawHud(ctx, game) {
   ctx.textBaseline = 'alphabetic';
 
   // --- vitals -------------------------------------------------------------
-  panel(ctx, 16, 16, 268, 92);
-  bar(ctx, 26, 26, 248, 22, player.blood / BLOOD_MAX, '#b01f36', '#2a1218',
-      `BLOOD ${Math.ceil(player.blood)}`);
-  bar(ctx, 26, 54, 248, 18, player.mana / MANA_MAX, '#7a45d0', '#1d1630',
-      `NIGHT ${Math.ceil(player.mana)}`);
+  // Two glasses instead of two bars.  They are the same two numbers, but a
+  // glass is read at a glance and from the corner of the eye, which is the
+  // only way anybody reads their health while something is chasing them.
+  panel(ctx, 16, 16, 268, 140);
+  chalice(ctx, 62, 24, 58, 86, player.blood / BLOOD_MAX, 'blood',
+          { fill: '#b01f36', empty: '#241016', glass: '#e8dae0',
+            label: '#c98a96', value: '#efe8f8' },
+          clock.t, 'BLOOD', `${Math.ceil(player.blood)}`);
+  chalice(ctx, 182, 24, 58, 86, player.mana / MANA_MAX, 'night',
+          { fill: '#7a45d0', empty: '#1a1430', glass: '#ded4f0',
+            label: '#a89ac8', value: '#efe8f8' },
+          clock.t, 'NIGHT', `${Math.ceil(player.mana)}`);
   ctx.fillStyle = player.candy > 0 ? '#e8b23a' : '#7a7488';
   ctx.font = FONT(15);
   ctx.textAlign = 'left';
   let candyLine = `CANDY ${player.candy}`;
   if (player.followers > 0) candyLine += `   KIDS IN TOW ${player.followers}`;
-  ctx.fillText(candyLine, 26, 94);
+  ctx.fillText(candyLine, 26, 148);
 
   // --- the hourglass ------------------------------------------------------
   // No digits.  The moon in the top bulb is ground down into the sun in the
@@ -147,15 +339,17 @@ function drawVision(ctx, game) {
   if (game.vision <= 0 && game.visionMix <= 0.01) return;
   const low = game.vision > 0 && game.vision < VISION_WARN;
   const blink = low && Math.floor(game.clock.t * 6) % 2 === 0;
-  panel(ctx, 16, 118, 268, 50, 0.86);
+  // pushed down to clear the chalices - the vitals panel got taller when the
+  // bars became glasses
+  panel(ctx, 16, 174, 268, 50, 0.86);
   ctx.textAlign = 'left';
   ctx.font = FONT(14);
   ctx.fillStyle = blink ? '#ffd0c4' : '#ff6a52';
-  ctx.fillText('VAMPIRE VISION', 26, 140);
+  ctx.fillText('VAMPIRE VISION', 26, 196);
   ctx.textAlign = 'right';
   ctx.fillStyle = blink ? '#ffd0c4' : '#e8dcff';
-  ctx.fillText(`${Math.ceil(game.vision)}s`, 274, 140);
-  bar(ctx, 26, 146, 248, 12, game.vision / VISION_SECONDS,
+  ctx.fillText(`${Math.ceil(game.vision)}s`, 274, 196);
+  bar(ctx, 26, 202, 248, 12, game.vision / VISION_SECONDS,
       blink ? '#ffb4a0' : '#c8382c', '#2a1414');
   ctx.textAlign = 'left';
 }
