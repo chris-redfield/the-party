@@ -178,8 +178,13 @@ export const MIN_SPEED_MULT = 0.42;
 export const KIDS_PER_BLOCK = [3, 6];
 // Real monsters, standing on the pavement all night dressed as trick-or-
 // treaters.  There are no adults out here, so these are the only things that
-// know anything, which is why there are more of them than there used to be.
-export const MONSTERS_PER_BLOCK = [0, 2];
+// know anything - but a monster you trip over on the way to the next one is
+// not worth finding, so there is at most ONE to a block and plenty of blocks
+// with none.  This is a chance rather than a range precisely so the cap is
+// structural: there is no number you can raise here that puts two on a block.
+// It is scaled by how much pavement the block has, so the smallest blocks are
+// the emptiest ones; most blocks are big enough that the scale tops out.
+export const MONSTER_CHANCE = 0.5;         // per block, before the size scale
 
 // Half of them lie.  A liar hands you a fact that is real somewhere else in
 // the city and wrong about the party, in exactly the words the truth would

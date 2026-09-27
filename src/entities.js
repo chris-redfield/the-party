@@ -1,5 +1,5 @@
 import {
-  KIDS_PER_BLOCK, MONSTERS_PER_BLOCK, CAT_CHANCE, CAT_RISE, CAT_STRIDE, LIAR_CHANCE,
+  KIDS_PER_BLOCK, MONSTER_CHANCE, CAT_CHANCE, CAT_RISE, CAT_STRIDE, LIAR_CHANCE,
   BEAST_SNAP, BEAST_KEEP,
   PUMPKINS_PER_BLOCK, PUMPKIN_CROSSING_CHANCE, PUMPKIN_R, PUMPKIN_BLOCK,
   PUMPKIN_LAT, PUMPKIN_CROSS_LAT,
@@ -141,7 +141,9 @@ export function populate(rng, city) {
     // you to the wrong side of the city and sound exactly like the half that
     // will not.  Nothing on screen ever marks it - not the sprite, not the
     // dialogue, not the card it gives you.
-    const nNpc = Math.round(rng.int(MONSTERS_PER_BLOCK[0], MONSTERS_PER_BLOCK[1]) * busy);
+    // One block, one monster at the very most - `busy` only thins the small
+    // blocks out, it can never buy a second one.
+    const nNpc = rng.chance(Math.min(1, MONSTER_CHANCE * busy)) ? 1 : 0;
     for (let i = 0; i < nNpc; i++) {
       const isWitch = rng.chance(0.42);
       const spec = isWitch ? realWitchSpec(rng) : realVampSpec(rng);

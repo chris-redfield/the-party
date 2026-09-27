@@ -472,16 +472,11 @@ function drawMinimap(ctx, game) {
   ctx.fillStyle = '#ffd24a';
   ctx.fillRect(MX(player.x) - 2, MY(player.y) - 2, 5, 5);
 
-  // while the vision holds, the monsters within earshot show up as pinpricks
-  if (game.visionMix > 0.1) {
-    ctx.globalAlpha = game.visionMix;
-    for (const n of game.world.npcs) {
-      if (Math.hypot(n.x - player.x, n.y - player.y) > 1500) continue;
-      ctx.fillStyle = n.kind === 'witch' ? '#7aff9a' : '#ff5a4a';
-      ctx.fillRect(MX(n.x) - 1, MY(n.y) - 1, 3, 3);
-    }
-    ctx.globalAlpha = 1;
-  }
+  // The map shows you where you are and what you have been told.  It does NOT
+  // show you where the monsters are: the vision used to put a pinprick on each
+  // one within earshot, which turned finding them into reading a radar instead
+  // of walking the street and looking.  The only mark on this map that moves
+  // is the yellow one, and that one is you.
 
   ctx.textAlign = 'center';
   ctx.font = FONT(11);
