@@ -41,6 +41,8 @@ EXCLUDE=(
   "assets/intro"                   # the intro frames, not used by the game yet
   "assets/dystopian-canticle"      # the typeface that lost; deathly is the one in use
   "assets/bats-ending.mp4.json"    # how that clip was cut; preview/scrub.html reads it, the game does not
+  "assets/ON5YU51.eps"             # 6 MB of stock scroll art; preview/scroll-prep.py traces it into
+                                   # src/scrollart.js and the game reads the numbers, never the art
 )
 
 echo "==> checking nothing excluded is actually needed"
