@@ -87,8 +87,9 @@ the pavement end to end. You cannot push through them. That is what the wings
 are for. Walking into one costs you blood, knocks you off your feet and stalls
 you for a moment, and they shout at you about it.
 
-You cannot tell anything from looking. Every figure on the street is the same
-height with the same too-big head, and some of them are not children.
+You cannot tell anything from looking. The street is fifteen drawn children in
+fifteen costumes, and the thing wearing one of those costumes over something
+else is drawn from the same fifteen — some of them are not children.
 
 **Somebody has left pumpkins out.** They stand on the pavement and on the
 painted crossings, they are about as big as a trick-or-treater, and they are
@@ -519,8 +520,8 @@ src/audio.js        procedural sound, and the one recorded thing there is:
                     the soundtrack in assets/ost, streamed and looped
 src/sprites.js      PLACEHOLDER ART for everybody drawn out of code.
 src/artwork.js      the ones who are not: the vampire, the witches, the
-                    nosferatu and the child in the witch costume, cut out
-                    of real drawings in assets/
+                    nosferatu, the cat, the shadow beasts and all fifteen
+                    children, cut out of real drawings in assets/
 src/input.js
 src/main.js         loop and wiring
 ```
@@ -567,11 +568,12 @@ replace `personSprite`, `catSprite` and `batSprite` with something that returns
 a canvas or image with `anchorX` / `anchorY` set to the sprite's feet, and
 nothing else has to change.
 
-**Four characters are the exception and are not drawn out of code**: the
-vampire you play, the two monsters you find standing on the pavement — the
-witch and the nosferatu — and one of the trick-or-treaters, the child in the
-witch costume. They are real drawings, and `src/artwork.js` cuts them out of
-their sheets and puts them on screen.
+**Almost nobody out here is drawn out of code any more**: the vampire you
+play, the two monsters you find standing on the pavement — the witch and the
+nosferatu — the cat, the shadow beasts, and every one of the fifteen
+trick-or-treaters. They are real drawings, and `src/artwork.js` cuts them out
+of their sheets and puts them on screen. What is left in `src/sprites.js` is
+the placeholder underneath and the bat.
 
 The vampire is `assets/vamp-frente e verso-01.png`, a sheet of eight: column 0
 is his back, column 1 his front, row 0 standing still and rows 1–3 the walk.
@@ -600,24 +602,46 @@ of it they are wearing a child's costume like every other monster, and that
 costume is still built out of code. They keep their colour when the street
 drains, the way every monster does.
 
-The child in the witch costume is `assets/party-child-001.png`, a column of
-three drawings. **The whole sheet is her walk** — there is no fourth cell for
+**Every child on the street is a drawing.** They are in `CHILD_SHEETS` at the
+top of `src/artwork.js` — the witch on `assets/party-child-001.png` by
+herself, then nine on `party-kids-01.png` and five on `party-kids-02.png`,
+fifteen in all. Every sheet reads the same way: **across is one child per
+column, down is three drawings of its walk**, and there is no fourth cell for
 standing still, because the middle drawing stands square enough on both feet
-to be her idle as well, and that is the one she holds when she stops.
-`CHILD_WITCH_BOX` is 24 art pixels, which is not a judgement call: it is what
-the coded kid she replaces already measures from the tip of her hat to her
-shoes, so the swap changes who she is and not how big she is. She is the only
-costume in the crowd that is a drawing, and a monster *wearing* that costume
-gets the drawing too — the disguise has to be the same child as the child
-standing next to it, or the disguise is the tell.
+to be the idle and that is the one they hold when they stop. Drop another
+sheet in that list and its children join the crowd; nothing else knows or
+cares which sheet anybody came off.
 
-Her walk runs off the child's own animation clock rather than off the `frame`
-number the coded sprite takes, since that frame only ever counts 0, 1 — it was
-written for a two-pose walk and would cost her the third drawing. It steps at
-the same six beats a second `updateKid()` drives the coded walk at, so a
-street of children still steps together. Like every child out there she is
-only ever drawn facing you: the kids walk a block's ring rather than a
-compass, and nothing in the crowd has a back.
+Which child a child is, is one seed rolled in `kidSpec()` and never changed,
+taken modulo however many drawings turned up. **Nobody is weighted and nobody
+is special** — the witch takes her turn as one of fifteen, and over a city of
+a thousand children they come out even (min 57, max 88 of an expected 65 on
+the night this was written, which is an ordinary chi-square for fifteen bins).
+A monster's disguise is built by that same `kidSpec()`, so the thing pretending
+to be a child draws from exactly the pool the children draw from. That is load
+bearing: a disguise off a different shelf from the children is the tell.
+
+**They are not all the same height, and that is on purpose.** Every child on
+every sheet is drawn at the same scale as every other, so one factor carries
+all of them from sheet pixels to art pixels: the witch lands on exactly the 24
+she has always been (`CHILD_BOX`, what the coded kid she replaced measured,
+hat to shoes) and the rest come out wherever their own drawings put them —
+about 16½ for the little ghost, about 25 for the one with the long head. The
+alternative, forcing every child to one height, would throw away the only size
+information the sheets carry, and the crowd is better for a short one and a
+tall one being in it.
+
+Their walk runs off the child's own animation clock rather than off the
+`frame` number the coded sprite takes, since that frame only ever counts 0, 1
+— it was written for a two-pose walk and would cost every one of them their
+third drawing. It steps at the same six beats a second `updateKid()` drives
+the coded walk at, so a street of children still steps together. They are only
+ever drawn facing you: the kids walk a block's ring rather than a compass, and
+nothing in the crowd has a back.
+
+The coded children in `src/sprites.js` are not gone — they are what stands on
+the pavement in the moment before the sheets land, and what is left if one
+never does.
 
 Two things about the sheet decide how that file works. Its background is white
 **and so is his face**, so keying white out would punch a hole through his

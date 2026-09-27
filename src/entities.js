@@ -39,6 +39,12 @@ function baseSpec(rng) {
 export function kidSpec(rng) {
   const s = baseSpec(rng);
   s.child = true;                 // shorter body, same size head
+  // Which of the drawn children this one is.  Every child in the city is a
+  // drawing now; the coded costume below it is only what stands there in the
+  // second before the sheets land, and what is left if one of them never
+  // does.  The seed is rolled here and never changes, so a child does not
+  // become a different child when the art arrives.
+  s.art = rng.int(0, 1e9);
   const costume = rng.pick(KID_COSTUMES);
   switch (costume) {
     case 'ghost': s.ghost = true; s.sheet = rng.pick(SHEETS); break;

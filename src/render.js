@@ -5,7 +5,7 @@ import {
 import { makeRng } from './rng.js';
 import { personSprite, catSprite, batSprite, greySprite } from './sprites.js';
 import { PLAYER_SPEC, batLift } from './player.js';
-import { vampFrame, witchArt, nosferatuArt, childWitchFrame, catArt, beastArt } from './artwork.js';
+import { vampFrame, witchArt, nosferatuArt, childFrame, catArt, beastArt } from './artwork.js';
 import { C, MIX, lerpHex, applyVision } from './palette.js';
 import { drawGround, drawBuilding, drawLamp, lampPositions , drawStreetPumpkin } from './scenery.js';
 
@@ -123,13 +123,13 @@ function drawSprite(ctx, cv, sx, sy, alpha) {
 // silhouettes does not read as a disguise coming off, it reads as a bug.
 function swapAt(mix) { return Math.max(0, Math.min(1, (mix - 0.3) / 0.4)); }
 
-// One costume in the crowd is a drawing rather than a grid of colours - the
-// witch.  It goes through here so that a monster wearing that costume gets the
-// drawing too: the disguise has to be the same child as the child standing
-// next to it, or the disguise is the tell.  Everybody else, and the witch
-// child herself until her sheet lands, is built out of code as before.
+// Every child out here is a drawing.  It goes through one place so that a
+// monster's disguise gets the same treatment: the costume a monster is
+// wearing has to be the same kind of thing as the child standing next to it,
+// or the disguise is the tell.  The coded sprite is what is left if a sheet
+// never arrives, and what stands there in the moment before it does.
 function childSprite(spec, dir, frame, anim, scale) {
-  return (spec.costume === 'witch' && childWitchFrame(frame, anim, scale))
+  return childFrame(spec.art, frame, anim, scale)
     || personSprite(spec, dir, frame, scale);
 }
 

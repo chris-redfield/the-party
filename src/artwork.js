@@ -34,11 +34,22 @@ const VAMP_COLS = 2, VAMP_ROWS = 4;
 const WITCH_SHEET = 'assets/party-witch-01.png';
 const NOSFERATU_SHEET = 'assets/party-nosferatu-01.png';
 
-// One of the children is a drawing as well.  `assets/party-child-001.png` is
-// a column of three: the whole sheet is her walk, and the middle drawing
-// stands square enough on both feet to be her idle too, so there is no fourth
-// cell for standing still.
-const CHILD_WITCH_SHEET = 'assets/party-child-001.png';
+// The children.  All of them: there is no such thing as a coded child on that
+// pavement any more, only a drawn one and the placeholder that stands in for
+// it until the sheets land.
+//
+// Every sheet reads the same way.  Across is one child per column, down is
+// three drawings of its walk, and the middle drawing stands square enough on
+// both feet to be the idle as well - so there is no fourth cell for standing
+// still, on any of them.  The witch was the first and has a sheet to herself;
+// the other fourteen came later, nine on one sheet and five on the next, and
+// nothing in here knows or cares which sheet a child came off.  Drop another
+// sheet in this list and those children join the crowd.
+const CHILD_SHEETS = [
+  ['witch', 'assets/party-child-001.png'],
+  ['kids1', 'assets/party-kids-01.png'],
+  ['kids2', 'assets/party-kids-02.png'],
+];
 
 // And the cat.  Four drawings in a column: sitting, up on its feet, and two
 // of the walk.  They all face left, so it is the cat walking right that is
@@ -70,13 +81,20 @@ export const WITCH_BOX = VAMP_BOX * 1.2;
 // vampire you play, close enough to read as one of your own kind rather than
 // as one of hers, and short enough that he is not the one you look at first.
 export const NOSFERATU_BOX = VAMP_BOX * 0.9;
-// The child in the witch costume is the one size in here that is not a
-// judgement call: it is what the coded kid she replaces already measures on
-// the pavement, 16 x 24 art pixels from the tip of the hat to her shoes.  The
-// drawing takes her height so that swapping her over changes who she is and
-// not how big she is - a child who grew when the art landed would move every
-// crowd she stands in.
-export const CHILD_WITCH_BOX = 24;
+// The one number the whole crowd is sized off, and it is not a judgement
+// call: it is what the coded witch-costume kid measured on the pavement, 24
+// art pixels from the tip of her hat to her shoes, and she is the tallest
+// child drawn.
+//
+// **It is not a height every child is forced to.**  Every child on every
+// sheet is drawn at the same scale as every other, so one factor takes all of
+// them from sheet pixels to art pixels - the witch lands on exactly the 24
+// she has always been, and the rest come out wherever their own drawings put
+// them.  That is the point: a ghost that is drawn shorter than a dinosaur is
+// shorter than the dinosaur on the street, and the witch keeps the extra that
+// her hat is worth.  Forcing them all to one height would flatten out the
+// only size information the sheets carry.
+export const CHILD_BOX = 24;
 // The cat is the one of these that is deliberately not the size of the sprite
 // it replaces.  The coded cat measures 14 x 12 art pixels and the drawing was
 // matched to it at first, which made a correct-looking cat that nobody would
@@ -100,6 +118,10 @@ const WHITE = 232;
 // a full box, so every cell of a sheet is scaled by the same amount
 const sheets = {};
 const cache = new Map();
+// every drawn child in the city, in one flat list, and the scale they all
+// share - art pixels per pixel of sheet.  See adoptChildren().
+let children = [];
+let childPx = 0;
 
 /**
  * Load the sheet and cut it up.  Nothing waits on this - until it lands the
@@ -110,7 +132,8 @@ export async function loadArtwork() {
     sheet('vamp', VAMP_SHEET, VAMP_COLS, VAMP_ROWS),
     sheet('witch', WITCH_SHEET, 1, 1),
     sheet('nosferatu', NOSFERATU_SHEET, 1, 1),
-    sheet('childWitch', CHILD_WITCH_SHEET, 1, 3),
+    Promise.all(CHILD_SHEETS.map(([key, url]) => childSheet(key, url)))
+      .then(adoptChildren),
     sheet('cat', CAT_SHEET, 1, 4),
     sheet('beast', BEAST_SHEET),          // no grid: cut at the empty rows
   ]);
@@ -130,10 +153,47 @@ async function sheet(name, url, cols, rows) {
   }
 }
 
+/**
+ * A sheet of children.  One column is one child, and what comes back is one
+ * entry per child rather than one per sheet: after this nothing cares which
+ * sheet anybody came off, which is what lets a new sheet be a new line in
+ * CHILD_SHEETS and nothing else.
+ */
+async function childSheet(key, url) {
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res;
+      img.onerror = () => rej(new Error(`${url} did not load`));
+      img.src = url;
+    });
+    return cutChildren(img, key);
+  } catch (e) {
+    console.warn(`artwork: ${e.message} - those children keep the placeholder`);
+    return [];
+  }
+}
+
+/**
+ * Take the lot of them as one crowd, and work out the one scale they are all
+ * drawn at.  It is anchored on the witch, because her height is the one that
+ * was agreed and the rest are drawn against her; if her sheet is the one that
+ * failed, the tallest child standing takes her place, which keeps the crowd
+ * the size it should be rather than shrinking it around a missing drawing.
+ */
+function adoptChildren(sets) {
+  children = sets.flat();
+  if (!children.length) return;
+  const witch = children.find(c => c.key.startsWith('witch'));
+  const ref = witch ? witch.unit : Math.max(...children.map(c => c.unit));
+  childPx = CHILD_BOX / ref;
+}
+
 export const vampArtReady = () => !!sheets.vamp;
 export const witchArtReady = () => !!sheets.witch;
 export const nosferatuArtReady = () => !!sheets.nosferatu;
-export const childWitchArtReady = () => !!sheets.childWitch;
+export const childArtReady = () => children.length > 0;
+export const childArtCount = () => children.length;
 export const catArtReady = () => !!sheets.cat;
 
 function cut(img, COLS, ROWS) {
@@ -158,26 +218,62 @@ function cut(img, COLS, ROWS) {
  * is concerned.
  */
 function cutBands(img) {
+  const { rows } = inkLines(img);
+  return cutRects(img, runs(rows).map(([y, h]) => [{ x: 0, y, w: img.width, h }]));
+}
+
+/**
+ * The same idea in both directions, for a sheet of several characters side by
+ * side: the empty columns cut it into characters and the empty rows cut each
+ * of those into frames.  What comes back is one entry per character, each
+ * with its own frames, its own tallest frame and its own extents - so a wide
+ * child and a narrow one are two separate little sheets from here on, and
+ * neither is padded out to the other's width.
+ *
+ * The rule is the one cutBands() imposes, in both directions now: a clear row
+ * between two frames, a clear column between two characters.  A sheet where
+ * two of them overlap even by a pixel is a sheet with fewer, wider characters
+ * on it than the artist thinks.
+ */
+function cutChildren(img, key) {
+  const { rows, cols } = inkLines(img);
+  const rb = runs(rows), cb = runs(cols);
+  return cb.map(([x, w], i) => {
+    const kid = cutRects(img, rb.map(([y, h]) => [{ x, y, w, h }]));
+    kid.key = `${key}|${i}`;
+    return kid;
+  });
+}
+
+/** Which rows and which columns of a sheet have anything in them at all. */
+function inkLines(img) {
   const cv = document.createElement('canvas');
   cv.width = img.width; cv.height = img.height;
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(img, 0, 0);
   const d = ctx.getImageData(0, 0, img.width, img.height).data;
-
-  const rects = [];
-  let start = -1;
-  for (let y = 0; y <= img.height; y++) {
-    let ink = false;
-    for (let x = 0; x < img.width && y < img.height; x++) {
+  const rows = new Uint8Array(img.height), cols = new Uint8Array(img.width);
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
       const o = (y * img.width + x) * 4;
       if (d[o + 3] >= 24 && !(d[o] >= WHITE && d[o + 1] >= WHITE && d[o + 2] >= WHITE)) {
-        ink = true; break;
+        rows[y] = 1; cols[x] = 1;
       }
     }
-    if (ink && start < 0) start = y;
-    else if (!ink && start >= 0) { rects.push([{ x: 0, y: start, w: img.width, h: y - start }]); start = -1; }
   }
-  return cutRects(img, rects);
+  return { rows, cols };
+}
+
+/** The runs of set flags in a line, as [start, length]. */
+function runs(flags) {
+  const out = [];
+  let start = -1;
+  for (let i = 0; i <= flags.length; i++) {
+    const on = i < flags.length && flags[i];
+    if (on && start < 0) start = i;
+    else if (!on && start >= 0) { out.push([start, i - start]); start = -1; }
+  }
+  return out;
 }
 
 function cutRects(img, rects) {
@@ -307,24 +403,31 @@ export function witchArt(scale) { return still('witch', WITCH_BOX, scale); }
 /** The other monster on the pavement, drawn the same way and just as still. */
 export function nosferatuArt(scale) { return still('nosferatu', NOSFERATU_BOX, scale); }
 
-// Her walk is the sheet, top to bottom, and the middle drawing doubles as the
-// idle.  It is driven off the child's own animation clock rather than off the
-// `frame` the coded sprite uses, because that frame only ever counts 0, 1 -
-// it was written for a two-pose walk - and reading it would cost her the
-// third drawing.  Same cadence the coded walk runs at, so a street of children
-// still steps together.
-const CHILD_WALK = [0, 1, 2];
+// A child's walk is its column, top to bottom, and the middle drawing doubles
+// as the idle.  It is driven off the child's own animation clock rather than
+// off the `frame` the coded sprite uses, because that frame only ever counts
+// 0, 1 - it was written for a two-pose walk - and reading it would cost every
+// one of them their third drawing.  Same cadence the coded walk runs at, so a
+// street of children still steps together.
+//
+// Which child a child is, is `seed` modulo however many drawings turned up:
+// one seed per kid, rolled once when the city is populated.  Nobody is
+// weighted and nobody is special - the witch takes her turn as one of fifteen
+// - and adding a sheet changes the odds for everybody without a line of code.
 const CHILD_IDLE = 1;
 const CHILD_RATE = 6;                   // beats a second, as in updateKid()
 
-export function childWitchFrame(frame, anim, scale) {
-  const sh = sheets.childWitch;
-  if (!sh) return null;
-  const row = frame < 0 ? CHILD_IDLE
-    : CHILD_WALK[Math.floor((anim || 0) * CHILD_RATE) % CHILD_WALK.length];
-  const cell = sh.grid[row][0];
+export function childFrame(seed, frame, anim, scale) {
+  if (seed == null || !children.length) return null;
+  const kid = children[((seed % children.length) + children.length) % children.length];
+  const rows = kid.grid.length;
+  const row = frame < 0 ? Math.min(CHILD_IDLE, rows - 1)
+    : Math.floor((anim || 0) * CHILD_RATE) % rows;
+  const cell = (kid.grid[row] || [])[0] || (kid.grid[Math.min(CHILD_IDLE, rows - 1)] || [])[0];
   if (!cell) return null;
-  return scaled(`childWitch|${row}`, cell, sh, CHILD_WITCH_BOX, false, scale);
+  // kid.unit * childPx is this child's own height at the crowd's one scale -
+  // see CHILD_BOX.  It is not a number anybody chose for this child.
+  return scaled(`${kid.key}|${row}`, cell, kid, kid.unit * childPx, false, scale);
 }
 
 // Which drawing the cat is standing in.  `pose` is the animal's own state -
