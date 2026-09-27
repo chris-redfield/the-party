@@ -133,9 +133,38 @@ function childSprite(spec, dir, frame, anim, scale) {
     || personSprite(spec, dir, frame, scale);
 }
 
+/**
+ * Where something that lives in the world lands on the screen.
+ *
+ * The city rounds once, through `ox`, and everything standing in the city
+ * rounds its own offset from that same whole number - so the gap between a
+ * child and the paving stone it is standing on is a fixed number of pixels
+ * and cannot open and close by one as the camera slides underneath them.
+ * That opening and closing is what a standing child shaking actually is: two
+ * roundings of the same sliding number, half a pixel out of step with each
+ * other, one for the street and one for the child.
+ *
+ * The player does not come through here.  He is the one thing that is meant
+ * to hold still against the *screen* rather than against the street, so he
+ * goes on rounding once from the true offset - see drawPlayer.  What that
+ * costs is up to a pixel between him and the world, and it is not a cost you
+ * can see, because he is the one that is moving.
+ *
+ * `worldLattice` is evaluation furniture: PARTY.worldLattice(false) puts the
+ * people back on the camera's lattice for a side-by-side, and it comes out of
+ * here once this is settled.
+ */
+let worldLattice = true;
+export function setWorldLattice(on) { worldLattice = !!on; }
+
+function worldPos(o, x, y) {
+  if (!worldLattice) return { gx: o.oxf + x * o.z, gy: o.oyf + y * o.z };
+  return { gx: o.ox + Math.round(x * o.z), gy: o.oy + Math.round(y * o.z) };
+}
+
 function drawPerson(ctx, e, o, t) {
-  const { oxf, oyf, z } = o;
-  const gx = oxf + e.x * z, gy = oyf + e.y * z;      // where the feet actually are
+  const { z } = o;
+  const { gx, gy } = worldPos(o, e.x, e.y);          // where the feet actually are
   const dir = e.dir || 'down';
   const frame = e.frame === undefined ? -1 : e.frame;
   const scale = PX * z;
@@ -274,8 +303,8 @@ function drawNpc(ctx, n, o, t) {
 function drawCat(ctx, c, o, t) {
   const a = 1 - MIX.vision;
   if (a <= 0.02) return;
-  const { oxf, oyf, z } = o;
-  const sx = oxf + c.x * z, sy = oyf + c.y * z;
+  const { z } = o;
+  const { gx: sx, gy: sy } = worldPos(o, c.x, c.y);
   shadow(ctx, sx, sy, z, 7, 0.28 * a);
   const drawn = catArt(c.pose, c.step, c.faceLeft, PX * z);
   drawSprite(ctx, drawn || catSprite(c.used ? '#6a6a72' : c.eye, PX * z), sx, sy, a);
@@ -299,7 +328,8 @@ function drawBeast(ctx, b, o, t) {
   const cv = beastArt(b.seed, b.faceLeft, PX * o.z);
   if (!cv) return;               // they are the drawing or they are nothing
   const lift = 5 + Math.sin(t * 1.6 + b.bob) * 3;
-  drawSprite(ctx, cv, o.oxf + b.x * o.z, o.oyf + (b.y - lift) * o.z, a);
+  const { gx, gy } = worldPos(o, b.x, b.y);
+  drawSprite(ctx, cv, gx, gy - lift * o.z, a);
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { hashSeed } from './rng.js';
 import { newGame, updateGame, knock, bringTipForward, giveTip } from './game.js';
 import { isWalkable } from './city.js';
 import { FACT_KEYS } from './hints.js';
-import { makeCamera, updateCamera, drawScene, drawBleed } from './render.js';
+import { makeCamera, updateCamera, drawScene, drawBleed, setWorldLattice } from './render.js';
 import { drawHud, drawTitle, drawEnd, drawPause, cardAt, tipVotes } from './hud.js';
 import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic } from './audio.js';
 import { loadDeathFonts } from './deathtype.js';
@@ -132,6 +132,9 @@ function frame(now) {
 // A small hatch for tinkering from the browser console.
 window.PARTY = {
   get game() { return game; },
+  get cam() { return cam; },
+  /** A/B for the rounding rule the people are drawn on - evaluation only. */
+  worldLattice(on) { setWorldLattice(on); return on ? 'people on the street lattice' : 'people on the camera lattice (the old rule)'; },
   restart,
   warp() {
     game.player.x = game.city.party.ax;

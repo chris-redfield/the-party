@@ -440,14 +440,35 @@ stamped at so they are never scaled, and stamped forty times a frame.
 city uses the rounded one: ground tiles and buildings are rigid bodies made of
 many parts, and they all have to round against the same whole number or a
 window drifts inside its own facade and a tile opens a seam at its edge.
-Everything alive uses the true, unrounded one, and is rounded exactly once
-from its real position on screen. Round the camera first and the sprite
-second and you have two staircases stepping on different frames: as the camera
-chases the vampire the two nearly cancel, and what is left over is a pixel of
-him twitching back and forth along whatever direction he is walking. It stops
-dead when he walks into a wall, because then neither staircase is advancing.
+**The player** uses the true, unrounded one, and is rounded exactly once from
+his real position on screen. Round the camera first and the sprite second and
+you have two staircases stepping on different frames: as the camera chases the
+vampire the two nearly cancel, and what is left over is a pixel of him
+twitching back and forth along whatever direction he is walking. It stops dead
+when he walks into a wall, because then neither staircase is advancing.
 Measured over 400 frames at a walking pace: fourteen direction reversals
 before, none after.
+
+**Everybody else rounds with the street, not with the camera.** That rule used
+to cover everything alive, and it was wrong for everything that is not the
+player: a standing child sat at `round(camera + x)` while the pavement under
+her sat at `round(camera)`, two roundings of the same sliding number half a
+pixel out of step, so the gap between her feet and the paving stone opened and
+closed by a pixel as the camera went past. That is what a still child
+shivering actually is. So `worldPos()` in `src/render.js` puts children,
+monsters, cats and beasts on the city's whole number and rounds their own
+offset from it — the gap is then a fixed integer and cannot change, whatever
+the camera does. Measured over 420 frames of walking: **75 reversals before, 0
+after**, and the player's own count is untouched at 2, because his code path
+never changed. Proved in pixels as well as in arithmetic — the camera swept
+across one screen pixel in eighths, the child isolated by differencing each
+frame against the same frame with her hidden: her gap to the street reads 1095
+at every offset, and her drawn pixel count is identical in all eight frames.
+
+What it costs is up to one pixel between the player and the world, and that is
+the right thing to spend it on: he is the one that is moving, and the eye
+catches a still figure shivering against a still street long before it catches
+a walking one being a pixel out.
 
 The people are not part of any of this. `drawSprite` turns image smoothing off
 for exactly as long as it takes to stamp one down, so the trick-or-treaters
