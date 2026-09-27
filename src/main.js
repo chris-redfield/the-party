@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, END, MENU, MENU_POP } from './config.js';
+import { VIEW_W, VIEW_H, ZOOMS, DEFAULT_ZOOM, VISION_SECONDS, MIN_PER_SEC, INK, CHALICE, END, MENU, MENU_POP, INTRO } from './config.js';
 import { resetInk, inkShapeCount } from './ink.js';
 import { makeInput } from './input.js';
 import { hashSeed } from './rng.js';
@@ -11,6 +11,7 @@ import { resumeAudio, toggleMute, setBassProximity, setMusicPaused, restartMusic
 import { loadDeathFonts } from './deathtype.js';
 import { loadBats } from './bats.js';
 import { loadLabel, advanceLabel, drawLabel, labelDone } from './label.js';
+import { loadIntro, advanceIntro, drawIntro, introDone, rewindIntro, introReady } from './intro.js';
 import { loadArtwork } from './artwork.js';
 
 const canvas = document.getElementById('game');
@@ -50,7 +51,12 @@ Promise.race([
   // a floor under it, so a sulking asset server cannot hold the game on a
   // black screen: every one of those falls back on its own anyway
   new Promise(r => setTimeout(r, 8000)),
-]).then(() => { ready = true; });
+]).then(() => {
+  ready = true;
+  // four megabytes of drawings, wanted at the next screen but one: the menu
+  // is the whole time they have to arrive, and they are not waited on here
+  loadIntro();
+});
 
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
@@ -68,6 +74,7 @@ let paused = false;
 let batsStarted = false;
 let menuIdx = 0;                   // which way in is lit on the front door
 let menuPop = null;                // seconds since one was chosen, or null
+let introT = 0;                    // seconds into the drawn intro
 let labelT = new URLSearchParams(location.search).get('label') === '0' ? 1e9 : 0;
 let last = performance.now();
 
@@ -165,7 +172,8 @@ function frame(now) {
     } else {
       menuPop += dt;
       if (menuPop >= MENU_POP.hold) {
-        game.state = MENU[menuIdx][1];
+        const to = MENU[menuIdx][1];
+        game.state = to === 'play' ? beginNight() : to;
         menuPop = null;
       }
     }
@@ -174,7 +182,7 @@ function frame(now) {
     // The red card the game used to open on.  ENTER still starts the night
     // from here, because that is what it has always done on this card.
     setBassProximity(0);
-    if (input.pressed('start') || input.pressed('bat')) { resumeAudio(); game.state = 'play'; }
+    if (input.pressed('start') || input.pressed('bat')) { resumeAudio(); game.state = beginNight(); }
     if (input.pressed('pause')) game.state = 'title';
     drawTitle(ctx, now / 1000);
   } else if (game.state === 'credits') {
@@ -183,6 +191,14 @@ function frame(now) {
       game.state = 'title';
     }
     drawCredits(ctx, now / 1000);
+  } else if (game.state === 'intro') {
+    // The drawn intro, which is not the game: the clock does not run, nothing
+    // is simulated, and it ends on its own last frame - which is black, so it
+    // hands to the street without needing anything between them.
+    setBassProximity(0);
+    introT = advanceIntro(introT, dt, input.pressed('start') || input.pressed('bat'));
+    drawIntro(ctx, introT);
+    if (introDone(introT)) game.state = 'play';
   } else if (game.state === 'win' || game.state === 'lose') {
     setBassProximity(game.state === 'win' ? 0.9 : 0);
     updateCamera(cam, game.player, dt);
@@ -212,6 +228,14 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+/** Choosing to play does not start the night, it starts the drawing of it. */
+function beginNight() {
+  if (!INTRO.on) return 'play';
+  introT = 0;
+  rewindIntro();
+  return 'intro';
+}
+
 // A small hatch for tinkering from the browser console.
 window.PARTY = {
   get game() { return game; },
@@ -221,6 +245,16 @@ window.PARTY = {
   get ready() { return ready; },
   /** light a way in, and pin its punch part way through, for looking at it */
   menu(i = 0, pop = null) { menuIdx = i; menuPop = pop; },
+  /** are the intro's drawings in yet? */
+  get introLoaded() { return introReady(); },
+  /** pin the intro part way through, for looking at one drawing */
+  introAt(sec) { game.state = 'intro'; introT = sec; },
+  /** replay the intro, optionally at a different rate - PARTY.intro(6) */
+  intro(fps) {
+    if (fps) INTRO.frame = 1 / fps;
+    game.state = beginNight();
+    return `${(1 / INTRO.frame).toFixed(1)} a second, ${(22 * INTRO.frame).toFixed(1)} s in all`;
+  },
   get cam() { return cam; },
   /**
    * A/B for the drawn line on the buildings.  `PARTY.ink(false)` puts the old

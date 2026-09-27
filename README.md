@@ -524,6 +524,48 @@ sentence broken over two lines reads as one.
 > reads as a second font having been patched in. Acute, grave, circumflex,
 > tilde, diaeresis and cedilla, which covers Portuguese.
 
+### The night before the night
+
+**Choosing to play does not start the night, it starts the drawing of it.**
+Twenty-two drawings play once — the vampire against a red sky, the clouds
+going over, the moon coming up, the whole thing draining down to black, which
+is the frame it ends on, so it needs no way out. It hands straight to the
+street. Both ways in reach it: START GAME, and `ENTER` from HOW TO PLAY.
+Dying and starting another night does not replay it, the same way it does not
+replay the studio label.
+
+**He talks over it**, in the same box the monsters talk in on the pavement,
+because it is the same man talking — `drawSpeech()` is split out of the
+dialogue box for exactly that. The line types itself out a character at a
+time at `INTRO.cps`. It is **wrapped whole and then cut, never wrapped as it
+grows**: wrapping the part that has arrived reflows the box on the letter that
+tips a word onto the next line, and words jump about while you are reading
+them.
+
+**The first press does not skip it, it finishes the line**; the second one
+leaves. That is the convention the box is borrowed from and it is the right
+one — somebody hitting a key at a sentence that is still arriving wants the
+rest of it, not to lose it. Neither press counts for the first `INTRO.arm`,
+because a key still held from the menu would take the intro away before it had
+drawn twice.
+
+**The drawings and the line are not tied to each other.** The intro lasts
+whichever wants longer, so a faster one still leaves the line up to be read and
+a slower one is not cut short by it. At `frame` 0.3 the 22 drawings are 6.6 s
+and the line is 6.4 s, so they land together; `PARTY.intro(8)` replays it at
+eight a second to compare rather than guess.
+
+It plays `assets/intro-frames/`, not `assets/intro/`. The drawings arrive
+1798 × 858 against a 1280-wide canvas, so better than half of every one of
+them is thrown away on the way to the screen — 4.2 MB of PNG to draw 1.0 MB of
+picture, and all of it decoded before the intro may start, which is a black
+screen where an animation should be. `preview/intro-prep.py` fits them to the
+width and writes webp: **343 kB for the lot, a mean difference of 0.71/255**
+against the drawings at the size they are actually shown. It renumbers them
+too, because the drawings are 01–11 and 13–23 with no 12, and a gap in a
+sequence is a thing every reader of it has to know about. `INTRO.frames` is
+how many there are, and the script prints it.
+
 ### The hourglass
 
 **There are no digits on the clock, because there is no clock.** The only thing
@@ -849,6 +891,7 @@ src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
 src/label.js        the studio's label, which is the first thing on screen
+src/intro.js        the drawn intro, and the line he says over it
 src/bats.js         the room behind the right door: the clip that plays
                     under the winning card, and its still-image fallback
 src/audio.js        procedural sound, and the one recorded thing there is:
@@ -1050,6 +1093,8 @@ PARTY.win()        // knock on the right door
 PARTY.restart()    // a fresh night
 PARTY.bench()      // ms a frame of city costs
 PARTY.menu(1, 0.06)      // light a way in and pin its punch, to look at it
+PARTY.intro(8)     // replay the intro, at eight drawings a second
+PARTY.introAt(3.0)       // ...or pin it three seconds in
 PARTY.END          // the ending's live dials - source, type, textAt, snap
 PARTY.label        // seconds the studio label has been up
 PARTY.ready        // false while the art is still being cut

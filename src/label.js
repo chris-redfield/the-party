@@ -41,7 +41,11 @@ export async function loadLabel() {
         img.onerror = () => rej(new Error(file));
         img.src = DIR + file;
       });
-      if (img.decode) await img.decode();
+      // Its own catch: decode() is an optimisation - it moves the cost off the
+      // first drawImage - and a decode that rejects is NOT a picture that
+      // failed to load.  Letting it fall into the catch below threw away 22
+      // perfectly good frames and left the intro on a black screen.
+      if (img.decode) { try { await img.decode(); } catch (e) { /* drawable anyway */ } }
       return img;
     } catch (e) {
       console.warn(`label: ${file} did not load`);

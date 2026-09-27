@@ -368,33 +368,51 @@ function drawVision(ctx, game) {
 
 // ---------------------------------------------------------------------------
 function drawDialogue(ctx, d) {
+  drawSpeech(ctx, d.name, d.text, 'E / SPACE to continue', d.nameColor);
+}
+
+/**
+ * The box somebody talks in.  Split out of drawDialogue so the intro can use
+ * it: a line spoken over the drawings should be the same box, in the same
+ * face, in the same place as every line spoken on the pavement - it is the
+ * same man talking.
+ */
+export function drawSpeech(ctx, name, text, hint, nameColor, reveal) {
   const boxW = 780, boxH = 122;
   const x = VIEW_W / 2 - boxW / 2, y = VIEW_H - boxH - 28;
   panel(ctx, x, y, boxW, boxH, 0.9);
   ctx.textAlign = 'left';
   ctx.font = FONT(15);
-  ctx.fillStyle = d.nameColor || '#c9a8ff';
-  ctx.fillText(d.name, x + 22, y + 28);
+  ctx.fillStyle = nameColor || '#c9a8ff';
+  ctx.fillText(name, x + 22, y + 28);
   ctx.font = FONT(18, false);
   ctx.fillStyle = '#efe6fa';
-  wrap(ctx, d.text, x + 22, y + 56, boxW - 44, 24);
+  // `reveal` is how many characters of it have arrived - the line types itself
+  // out.  IT IS WRAPPED WHOLE AND THEN CUT, never wrapped as it grows: wrapping
+  // the part of it that has arrived reflows the box on the letter that tips a
+  // word onto the next line, and words jump about while you are reading them.
+  if (reveal == null) {
+    wrap(ctx, text, x + 22, y + 56, boxW - 44, 24);
+  } else {
+    let left = reveal, ty = y + 56;
+    for (const line of wrapLines(ctx, text, boxW - 44)) {
+      if (left <= 0) break;
+      ctx.fillText(left >= line.length ? line : line.slice(0, left), x + 22, ty);
+      left -= line.length + 1;      // the break counts, so the pace stays even
+      ty += 24;
+    }
+  }
+  if (!hint) return;
   ctx.font = FONT(12);
   ctx.fillStyle = '#8a7ea8';
   ctx.textAlign = 'right';
-  ctx.fillText('E / SPACE to continue', x + boxW - 20, y + boxH - 12);
+  ctx.fillText(hint, x + boxW - 20, y + boxH - 12);
 }
 
 function wrap(ctx, text, x, y, maxW, lh) {
-  const words = String(text).split(' ');
-  let line = '';
-  for (const w of words) {
-    const test = line ? line + ' ' + w : w;
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, x, y); y += lh; line = w;
-    } else line = test;
-  }
-  if (line) ctx.fillText(line, x, y);
+  for (const line of wrapLines(ctx, text, maxW)) { ctx.fillText(line, x, y); y += lh; }
 }
+
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Prepare the label screen's art for THE PARTY.
+Prepare the two front screens' art for THE PARTY: the studio label, and the
+drawn intro that plays before the night.
 
     python3 preview/intro-prep.py ../saborosa/beatemup-dungeon/dist/assets-v2/flying-dungeon
 
@@ -43,3 +44,31 @@ for y in range(lg.height):
 p = out / 'logo.webp'
 red.save(p, quality=90, method=6, lossless=False)
 print(f'{p}  {red.width}x{red.height} blood  {p.stat().st_size // 1024} kB')
+
+
+# --- the intro: 22 drawings, at the size they are actually drawn at ----------
+# They arrive 1798 x 858 and the canvas is 1280 wide, so better than half of
+# every one of them is thrown away by the browser on the way to the screen -
+# 4.2 MB of PNG to draw 1.0 MB of picture.  Worse, they all have to be decoded
+# before the intro can start, and a decode that has not finished is a black
+# screen where an animation should be.
+#
+# So they are fitted to the width here and written as webp, and renumbered
+# while we are at it: the drawings are 01-11 and 13-23, with no 12, and a gap
+# in a sequence is a thing every reader of it has to know about.  Out of here
+# they are 01..N with nothing missing.
+intro_src = sorted((src.parent / 'intro').glob('*.png')) if (src.parent / 'intro').exists() else []
+if not intro_src:
+    intro_src = sorted(pathlib.Path('assets/intro').glob('*.png'))
+if intro_src:
+    out2 = pathlib.Path('assets/intro-frames'); out2.mkdir(parents=True, exist_ok=True)
+    for old in out2.glob('*.webp'): old.unlink()
+    total = 0
+    for i, f in enumerate(intro_src, 1):
+        im = Image.open(f).convert('RGB')          # they are opaque already
+        h = round(W * im.height / im.width)
+        im = im.resize((W, h), Image.LANCZOS)
+        q = out2 / f'intro-{i:02d}.webp'
+        im.save(q, quality=88, method=6)
+        total += q.stat().st_size
+    print(f'{out2}/  {len(intro_src)} frames  {W}x{h}  {total // 1024} kB in all')

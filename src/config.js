@@ -169,6 +169,31 @@ export const LABEL = {
   wide: 0.52,       // how much of the screen the label spans
 };
 
+// --- the night before the night ---------------------------------------------
+// The drawn intro, played once between choosing to play and the street.  See
+// src/intro.js.  `frame` is the one dial that matters and it is not settled:
+// 22 frames at 0.125 is 2.8 seconds, at 0.2 is 4.4, at 0.3 is 6.6.  Try them
+// with PARTY.intro(fps) rather than by guessing - it replays at that rate on
+// the spot.
+// He talks over it, in the same box the monsters talk in on the pavement,
+// because it is the same man talking.  The line is 127 characters, which is
+// about six and a half seconds of reading at a pace nobody has to hurry - and
+// THE INTRO IS THE LONGER OF THE TWO, so changing `frame` moves the drawings
+// without ever cutting the line off.  At 0.3 they land together.
+export const INTRO = {
+  on: true,
+  frames: 22,       // how many are in assets/intro-frames/ - the prep script says
+  frame: 0.3,       // seconds a drawing is held - 22 of them is 6.6 s
+  read: 6.4,        // and how long the line is up for, at least
+  cps: 28,          // characters a second, typing themselves out
+  arm: 0.4,         // before a press may finish the line, or skip the intro
+  giveUp: 6,        // seconds to wait for the drawings before starting anyway
+  name: 'YOU',
+  line: 'I wonder where is my invitation for this year\u2019s party. ' +
+        'I hope this has nothing to do with last year\u2019s incident ' +
+        'with the hostess.',
+};
+
 // --- the front door ---------------------------------------------------------
 // The title screen is the one card in the game that is NOT the blood field:
 // black, with the name and the three ways in cut into it in red.  The red
