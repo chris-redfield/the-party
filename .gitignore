@@ -5,3 +5,17 @@ assets/bats-dancing.mp4
 # the itch build, rebuilt by ./package.sh whenever it is wanted
 dist/
 the-party-itch.zip
+
+# the raw screen recordings, 61 and 42 MB. Same rule as bats-dancing.mp4
+# above: the source stays out, the cut goes in. The cuts ARE committed —
+# The-party-pitch-v4.mp4 and design/the-party-gameplay.mp4.
+The-party-pitch-v3.mkv
+design/the-party-game-play.mkv
+
+# LibreOffice's scratch file while the deck is open. Never wanted.
+.~lock.*#
+
+# the "save it under a new name before you break it" copies of the deck.
+# Nine of them piled up in one afternoon. The real one is
+# design/THE-PARTY-pitch.pptx; these stay on disk, just not in the repo.
+*.backup-*.pptx
