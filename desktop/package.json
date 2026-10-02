@@ -1,7 +1,7 @@
 {
   "name": "the-party",
   "productName": "THE PARTY",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A Halloween game. You are an extremely cool vampire.",
   "author": "Team Saborosa",
   "main": "main.js",
