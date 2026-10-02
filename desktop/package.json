@@ -1,0 +1,20 @@
+{
+  "name": "the-party",
+  "productName": "THE PARTY",
+  "version": "1.0.0",
+  "description": "A Halloween game. You are an extremely cool vampire.",
+  "author": "Team Saborosa",
+  "main": "main.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "electron": "^33.0.0"
+  },
+  "scripts": {
+    "start": "electron . --windowed",
+    "fullscreen": "electron .",
+    "selftest": "electron . --selftest",
+    "package": "../package-desktop.sh"
+  }
+}

@@ -58,6 +58,150 @@ the first keypress) and the font's licence are the two expected ones.
 `?label=0` starts past the studio label, which is what any scripted or
 headless run wants — see below. `?seed=` and `?citySeed=` are the other two.
 
+### Shipping it as a program — Steam, and anything else that wants an .exe
+
+```bash
+./package-desktop.sh   # -> desktop/out/THE PARTY-win32-x64/  and  -linux-x64/
+```
+
+**Nothing is ported.** The game stays the HTML5 game it is; `desktop/game/` is
+a byte-for-byte copy of the `dist/` that `package.sh` just built and proved,
+and `desktop/main.js` is a small Electron shell around it — one window, no
+menu, and the four things a browser was doing for us that Steam will not:
+
+- **It serves the files over a real origin.** `party://` is registered as a
+  standard scheme and answered from disk. This is the step that is not
+  optional and the one everybody loses a day to: the game is ES modules, and
+  the spec forbids `import` from `file://`, so Electron's `loadFile()` opens
+  on a black screen with a CORS error. Same reason "Running it" above tells
+  you to start a web server. The handler answers Range requests too, because
+  Chromium asks for the ending's clip and the soundtrack in pieces.
+- **It lets the Steam overlay in.** Steam hooks the process that owns the GL
+  context and does not follow Chromium into its separate GPU process, so
+  without `--in-process-gpu` the overlay, Shift+Tab and Steam's screenshot key
+  all silently do nothing. It is a workaround for Steam's side and it has a
+  reputation for upsetting some Nvidia setups, so it is one flag from being
+  off: `--no-overlay-hack`, or `PARTY_OVERLAY_HACK=0`.
+- **It starts without a sandbox on Linux**, for two reasons. Electron's Linux
+  sandbox needs a setuid-root helper; Steam unpacks a depot as the player,
+  which strips that, and the game refuses to start. And on at least one
+  ordinary Ubuntu 22.04 laptop that sandbox's seccomp filter, against a kernel
+  newer than itself, refuses the syscall Chromium allocates every frame with —
+  see below, because it does not look like that at all. We render nothing but
+  our own local files from our own scheme, with no node in the renderer, so
+  there is nothing remote for a sandbox to contain. `--with-sandbox` puts it
+  back.
+- **It proves itself.** `--selftest` is `package.sh`'s "one 404 and it is not
+  a release" rule carried into the executable, and `package-desktop.sh` runs
+  it against the *packaged* Linux build rather than the source tree: it waits
+  out the loader, presses ENTER through the menu, HOW TO PLAY and the intro
+  with real OS-level key events, screenshots the city, and fails on a single
+  file the game asked for and did not get, a single renderer error, or a
+  screen that never reached `play`.
+
+```bash
+cd desktop && npm start           # windowed 1280x720
+cd desktop && npm run fullscreen  # how it ships; F11 or Alt+Enter toggles
+cd desktop && npm run selftest    # the scripted run, with a screenshot
+cd desktop && npm start -- --safe-mode    # see below
+```
+
+`--selftest --ending` adds the one thing a normal run cannot reach in under
+six minutes: it wins the night from the hook, pins `endT` so the capture lands
+on the same beat every time, and screenshots the winning card alongside the
+city. It also decodes `bats-ending.mp4` on its own, through `party://`, and
+prints `decodes` or the media error — the ending is 39 seconds of H.264 and
+the only asset a machine's own video stack can break by itself. A broken one
+is not fatal (`END.source` falls back to the still strip) but it is worth
+knowing before a player finds out.
+
+#### When it opens black, or dies on `/dev/shm` — it is the sandbox
+
+```
+FATAL:platform_shared_memory_region_posix.cc(219)] Creating shared memory in
+/dev/shm/... failed: No such process (3)
+```
+
+**`/dev/shm` is innocent and that message is a liar.** It is Chromium's own
+seccomp filter refusing a syscall, inside the sandboxed renderer, on a kernel
+newer than the filter. The sandbox is off on Linux and the message is gone.
+What follows is how to recognise it, because it cost an afternoon and it looks
+like three other bugs first.
+
+How it presents: FATAL on launch, or — once `--disable-dev-shm-usage` moves it
+— a window that opens black and stays black while that same line scrolls past
+forever. The machine is an ordinary Ubuntu 22.04 laptop on kernel 6.8.
+`/dev/shm` is mode 1777 with 16 GB free. `touch /dev/shm/x` works. A probe run
+from inside the Electron process writes there happily. Chrome runs fine on the
+same machine, because Chrome's sandbox is installed properly and ours is a
+prebuilt binary in a home directory.
+
+The tells, in the order they should have been convincing:
+
+- **`access()` cannot return `ESRCH`.** "No such process" is not one of its
+  errors. An impossible errno means something is answering instead of the
+  kernel, and the only thing that does that is a syscall filter.
+- **Sending it to `/tmp` moved the message, not the failure.** When a bug
+  follows you across filesystems, the directory is not the subject.
+- **The one configuration that worked, `--soft-frames`, also turned off
+  `contextIsolation` and with it the renderer sandbox**, for a completely
+  unrelated reason. That is what made this look like a frames problem for an
+  hour. When a fix works, check what else it changed.
+
+`--disable-dev-shm-usage` is still the Linux default (`--use-dev-shm` opts out)
+and `play-the-party.sh` still carries it on the command line. Both are belt and
+braces now; neither is the fix.
+
+Two lines on that same laptop are **not** a problem and should not be chased:
+`libva error: ... iHD_drv_video.so init failed` on every launch, and
+`ffmpeg_common.cc Unsupported pixel format: -1` when the ending's clip loads.
+That is Chromium trying hardware video decode, failing over to software, and
+succeeding. The ending was confirmed moving, by hand and by
+`--selftest --ending`, on the machine that prints them.
+
+The milder illness is real too, and has its own cause: a machine that
+composites nothing never calls `requestAnimationFrame`, so the page loads, the
+city is built, and nothing moves.
+
+**`--safe-mode`** is the answer to both: shared memory off `/dev/shm`, no GPU,
+and frames driven off a timer instead of off the compositor. The game is fully
+playable that way. Nothing has to ask for it, either — a normal run watches
+itself, and twenty seconds without a single frame restarts it in safe mode on
+its own.
+
+`--soft-frames` is the timer half alone, and `PARTY_SAFE_MODE=1` is the
+environment variable, for a Steam launch option on a machine that needs it.
+`--with-sandbox` restores Electron's Linux sandbox, which is otherwise off for
+the reason given above; it is there so that decision stays testable.
+
+Two traps are written into `desktop/main.js` because both of them cost a
+capture and look exactly like a broken game:
+
+- **A key press must be held for at least one frame.** `input.pressed` is an
+  edge read once per frame, so a down and up inside the same tick is never
+  seen: the build loads perfectly and sits on the title screen.
+- **A machine that composites nothing never calls `requestAnimationFrame`.**
+  The page loads, the canvas is the right size, the city is built — and
+  nothing moves, because frames are what drives the game. `--selftest` loads
+  `soft-frames.js`, which runs rAF off `setTimeout` instead; it is the
+  same shim `dev-harness.html` plays on headless Chrome, and it is why the
+  scripted run works on a CI box with no display at all. It is also why the
+  scripted run can pass on a machine where a plain launch opens black — if
+  you are testing whether a machine really renders, that is
+  `--selftest --no-soft-frames`.
+
+About 270 MB per platform, nearly all of it Chromium — the game itself is the
+same 10 MB that goes to itch. It is packaged with `--no-asar` on purpose: one
+archive means a one-line fix re-uploads the whole game as a changed file, and
+loose files let Steam's delta patching do its job. No installer is built,
+because a Steam depot *is* the folder: upload `desktop/out/THE PARTY-win32-x64`
+with ContentBuilder and set the launch executable to `the-party.exe`
+(`the-party` on Linux).
+
+Achievements, cloud saves and rich presence are not wired up; they need an App
+ID and a Steamworks binding (`steamworks.js`) and nothing else about the above
+changes when they arrive.
+
 ### The screen before the screen
 
 **The game opens on the studio's label, not on its own title.** It is the same
@@ -1116,6 +1260,14 @@ src/artwork.js      the ones who are not: the vampire, the witches, the
                     children, cut out of real drawings in assets/
 src/input.js
 src/main.js         loop and wiring
+
+package.sh          the itch.io build, and the proof that it loads
+package-desktop.sh  the same build, wrapped into Windows and Linux
+                    executables for Steam
+desktop/main.js     that wrapper: ~200 lines of Electron. serves the build
+                    over party://, opens one window, lets the Steam overlay
+                    in, and plays itself under --selftest
+desktop/soft-frames.js  frames off setTimeout, for the scripted run
 ```
 
 The shadow beasts are `assets/party-shadow beasts-01.png`, and that sheet is

@@ -19,3 +19,9 @@ design/the-party-game-play.mkv
 # Nine of them piled up in one afternoon. The real one is
 # design/THE-PARTY-pitch.pptx; these stay on disk, just not in the repo.
 *.backup-*.pptx
+
+# the desktop shell: deps, the copied web build, and the built executables
+desktop/node_modules/
+desktop/game/
+desktop/out/
+desktop/selftest*.png
