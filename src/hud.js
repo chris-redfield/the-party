@@ -882,6 +882,11 @@ export function drawPause(ctx) {
             VIEW_W / 2, VIEW_H / 2 + 54, 26);
   deathText(ctx, 'HOLD ENTER AND PRESS R FOR A DIFFERENT NIGHT',
             VIEW_W / 2, VIEW_H / 2 + 88, 26);
+  // The way out, and it is last because it is the one that costs you the
+  // night.  It goes to the front door rather than closing the game: the door
+  // is where EXIT lives, and on itch there is nothing to close anyway.
+  deathText(ctx, 'BACKSPACE TO LEAVE THE NIGHT',
+            VIEW_W / 2, VIEW_H / 2 + 122, 26);
 }
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,36 @@ function clear(x, y, fly) {
       && test(x - HALF_W, y + HALF_H) && test(x + HALF_W, y + HALF_H);
 }
 
+// Getting shoved around is the good part, and it is aimed by his centre alone:
+// the kids, the monsters and the pumpkins each put him on a ring around
+// themselves and only ask whether that one point is pavement.  His body is
+// wider than a point, so a knock towards a wall or out over the kerb can leave
+// a corner or two of him inside it.  Movement refuses any step whose four
+// corners are not all clear, and one step is about two pixels, so from in
+// there *every* direction is refused at once and he is welded to the spot -
+// the only way out was to spend blood on wings.
+//
+// So the overshoot is given back before he is asked to move: the shortest
+// nudge that puts the whole body on ground it may stand on.  The shove itself
+// is untouched.  The recoil you see is drawn from `bumpX/bumpY` in render.js
+// and never was his position, so he is still thrown about in every direction
+// and still ends up displaced - he just cannot be left standing in a wall.
+const OUT_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1],
+                  [-1, -1], [1, -1], [-1, 1], [1, 1]];
+// A centre-legal shove can bury him by at most a corner of the body box, so
+// the way out is never longer than that diagonal.
+const UNSTICK_MAX = Math.ceil(Math.hypot(HALF_W, HALF_H)) + 2;
+
+function unstick(p, fly) {
+  if (clear(p.x, p.y, fly)) return;
+  for (let d = 1; d <= UNSTICK_MAX; d++) {
+    for (const [ox, oy] of OUT_DIRS) {
+      const x = p.x + ox * d, y = p.y + oy * d;
+      if (clear(x, y, fly)) { p.x = x; p.y = y; return; }
+    }
+  }
+}
+
 export function makePlayer(x, y) {
   return {
     x, y, dir: 'down', faceX: 0, faceY: 1,
@@ -112,6 +142,7 @@ export function updatePlayer(p, dt, input) {
     p.mana = Math.min(MANA_MAX, p.mana + MANA_REGEN * dt);
   }
 
+  unstick(p, flying);
   const nx = p.x + vx * speed * dt;
   const ny = p.y + vy * speed * dt;
   if (clear(nx, p.y, flying)) p.x = nx;

@@ -122,6 +122,45 @@ function restart() {
   restartMusic();
 }
 
+/**
+ * Walking out of a night, from the pause card.  Not a restart: it lands on the
+ * front door instead of back in the street.
+ *
+ * The fresh night HAS to be built here rather than on the way back in, because
+ * `beginNight` only rewinds the intro - it does not build a world.  Without
+ * this the next START GAME would hand the player back the very night they just
+ * left, clock, candy and all.
+ *
+ * The soundtrack is deliberately NOT stopped.  It has been playing since the
+ * first keypress, over the front door as much as over the street, so the title
+ * card is a place it belongs - the end of a night fades it out because that
+ * ends on a card of its own, and this does not.  The one thing to undo is the
+ * pause card's own pause, or the music would be left stopped with nothing on
+ * the way back in to start it again.
+ */
+function toTitle() {
+  game = newGame(seedParam || undefined, citySeed);
+  game.state = 'title';
+  cam.x = game.player.x;
+  cam.y = game.player.y;
+  paused = false;
+  setMusicPaused(false);
+  menuIdx = 0;
+  menuPop = null;
+}
+
+/**
+ * Close the game.  Reachable only where it can work - EXIT is in the menu only
+ * when CAN_QUIT (see src/config.js).  `window.close()` shuts the shell's one
+ * window and its `window-all-closed` handler quits the app from there, so the
+ * page needs no IPC and no privileges and stays sandboxed.  Verified against
+ * the real shell: a sandboxed, context-isolated, node-less renderer closes it
+ * and Electron exits 0.
+ */
+function quitGame() {
+  window.close();
+}
+
 function frame(now) {
   let dt = (now - last) / 1000;
   last = now;
@@ -173,8 +212,10 @@ function frame(now) {
       menuPop += dt;
       if (menuPop >= MENU_POP.hold) {
         const to = MENU[menuIdx][1];
-        game.state = to === 'play' ? beginNight() : to;
         menuPop = null;
+        // EXIT is the one choice that does not lead to a screen
+        if (to === 'exit') quitGame();
+        else game.state = to === 'play' ? beginNight() : to;
       }
     }
     drawMenu(ctx, menuIdx, now / 1000, menuPop);
@@ -213,6 +254,19 @@ function frame(now) {
     // in src/input.js for why it is read off `start` rather than bound twice.
     if (input.pressed('start')) { paused = !paused; setMusicPaused(paused); }
     if (input.pressed('restart') && input.held('start')) restart();
+    // Backspace is `back`, and the note in src/input.js has it existing only
+    // where there is somewhere to go back TO - which on the pause card there
+    // now is.  ENTER cannot be the one that leaves: it is already the way back
+    // into the street, and that is the collision input.js refuses to have.
+    // Read only while PAUSED, so a stray Backspace out in the street can never
+    // throw a night away.  It returns before drawing, or the fresh night's
+    // street would flash up for a frame on the way to the front door.
+    if (paused && input.pressed('back')) {
+      toTitle();
+      input.endFrame();
+      requestAnimationFrame(frame);
+      return;
+    }
     if (paused) {
       setBassProximity(0);
     } else {

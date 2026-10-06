@@ -268,10 +268,19 @@ export const MENU_POP = {
   hold: 0.30,       // the beat the screen waits before it changes, or the
 };                  // punch plays on a screen nobody is looking at any more
 
+// Can this build close itself?  Only the desktop shell can: it serves the game
+// from its own `party://` scheme (desktop/main.js), so the protocol IS the
+// test - no flag to set and nothing to keep in step by hand.  On itch the game
+// is an iframe on an http(s) origin, where `window.close()` is a no-op by
+// spec, so there is nothing EXIT could do and the line is left out of the menu
+// rather than offered and dead.  See quitGame() in src/main.js.
+export const CAN_QUIT = typeof location !== 'undefined' && location.protocol === 'party:';
+
 export const MENU = [
   ['START GAME', 'play'],
   ['HOW TO PLAY', 'howto'],
   ['CREDITS', 'credits'],
+  ...(CAN_QUIT ? [['EXIT', 'exit']] : []),
 ];
 
 // The credits are the blood card, not the black one: black words cut out of
