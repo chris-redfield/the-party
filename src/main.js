@@ -334,15 +334,13 @@ window.PARTY = {
    */
   chalice(v) { if (v) Object.assign(CHALICE, v); return { ...CHALICE }; },
   /**
-   * A/B for the hourglass.  `PARTY.glass(false)` puts the old flat pixel-art
-   * clock back, `PARTY.glass(true)` returns to the drawn one, and an object
-   * turns one of the line's dials - `PARTY.glass({wobble: 2.5})` for a
-   * shakier hand, `{over: 0}` to stop the corners running past each other.
-   * Evaluation furniture; the loser of the two comes out.
+   * The hourglass's line.  `PARTY.glass({wobble: 2.5})` for a shakier hand,
+   * `{over: 0}` to stop the corners running past each other, `{weight: 3}` for
+   * a heavier stroke.  There is no longer a second clock to flip to: the flat
+   * pixel-art cut was deleted once the drawn one won.
    */
   glass(v) {
-    if (typeof v === 'boolean') GLASS.ink = v;
-    else if (v && typeof v === 'object') Object.assign(GLASS, v);
+    if (v && typeof v === 'object') Object.assign(GLASS, v);
     return { ...GLASS };
   },
   /**

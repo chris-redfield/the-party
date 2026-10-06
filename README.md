@@ -943,9 +943,10 @@ that are load-bearing:
 in — nothing snaps to that grid any more, it is only the ruler that keeps the
 clock the size it was. `GLASS` holds the drawn line's own dials, sized for an
 object this small (the city's `INK` numbers are cut for walls two hundred px
-long and come out clownish on a 124px clock), and `GLASS.ink` is an A/B:
-`false` puts the old pixel-art cut back, whole, out of `src/hourglass-pixel.js`
-— evaluation furniture, and the loser of the two comes out.
+long and come out clownish on a 124px clock). The clock was drawn twice while
+this was being decided — the older flat pixel-art cut was kept whole in
+`src/hourglass-pixel.js` behind a `GLASS.ink` flag — and the drawn one won, so
+the other file and its flag have been deleted.
 `GLASS_CLOCK_TEXT` puts the digits back underneath it if you want them.
 
 ### Vampire vision
@@ -1245,7 +1246,6 @@ src/scenery.js      the city: asphalt, kerbs, buildings, doors, decorations,
 src/render.js       camera, the draw order, the people, and the effects
 src/hud.js          vitals, minimap, the deck of tips, title and ends
 src/hourglass.js    the clock, which is a moon being ground into a sun
-src/hourglass-pixel.js  the older pixel-art cut of it, kept for the A/B
 src/scrollart.js    GENERATED - the minimap scroll's outlines, traced off
                     stock art by preview/scroll-prep.py
 src/label.js        the studio's label, which is the first thing on screen
@@ -1458,8 +1458,7 @@ PARTY.vision()     // 30 seconds of vampire vision (or vision(n) for n)
 PARTY.win()        // knock on the right door
 PARTY.restart()    // a fresh night
 PARTY.bench()      // ms a frame of city costs
-PARTY.glass(false)       // the old pixel-art hourglass; true for the drawn one
-PARTY.glass({wobble: 2.5})   // ...or turn one dial of its line
+PARTY.glass({wobble: 2.5})   // turn one dial of the hourglass's line
 PARTY.backWindows(true)  // put the windows back on the back building's roof
 PARTY.scroll({turn: 0.2}) // how much shadow the map's scroll keeps, 0..1
 PARTY.scroll({mapShift: 20})    // ...and where the city sits on the paper

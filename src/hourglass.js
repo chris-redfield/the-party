@@ -42,7 +42,6 @@
 // ---------------------------------------------------------------------------
 import { GLASS_UNIT, GLASS } from './config.js';
 import { inkEdge, inkPoly, INK_COLOR } from './ink.js';
-import { drawGlassPixel } from './hourglass-pixel.js';
 
 const U = GLASS_UNIT;
 const HALF = 15.5;                  // grid columns run -HALF .. +HALF
@@ -192,7 +191,6 @@ function level(ws, y0, frac) {
  * @param t  seconds, for the grains
  */
 export function drawHourglass(ctx, ox, oy, p, t, panic = false) {
-  if (!GLASS.ink) return drawGlassPixel(ctx, ox, oy, p, t, panic);
   p = Math.max(0, Math.min(1, p));
 
   // grid units -> screen.  Everything below is written in grid units.

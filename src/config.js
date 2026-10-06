@@ -192,14 +192,13 @@ export const BACK_WINDOWS = { on: false };
 export const SKYLIGHTS = { on: false };
 
 // --- how the hourglass is drawn ---------------------------------------------
-// `ink: false` puts the old flat pixel-art hourglass back (src/hourglass-pixel
-// .js) so the two can be looked at side by side - evaluation furniture, and it
-// comes out once this is settled.  The rest are the drawn line's dials, sized
-// for an object this small: the city's own INK numbers are cut for walls two
-// hundred px long and come out clownish on a 124px clock.
-// Live, from the console: `PARTY.glass(false)`, `PARTY.glass({wobble: 2})`.
+// The drawn line's dials, sized for an object this small: the city's own INK
+// numbers are cut for walls two hundred px long and come out clownish on a
+// 124px clock.  The clock was drawn twice while this was being settled - the
+// flat pixel-art cut lived in src/hourglass-pixel.js behind an `ink` flag -
+// and the drawn one won, so the other and its flag are gone.
+// Live, from the console: `PARTY.glass({wobble: 2})`.
 export const GLASS = {
-  ink: true,
   weight: 1.9,      // screen px - a shade lighter than the chalices' 1.95
   wobble: 1.0,      // how far the stroke wanders off true
   over: 1.7,        // how far a corner runs past its neighbour
